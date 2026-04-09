@@ -8,13 +8,13 @@ export default function Home() {
     { nombre: "Adobe Creative", precio: "80 Pesos", info: "Correo + Contraseña" },
   ];
 
-  return (
+   return (
     <main
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(circle at top, #2a0000 0%, #120000 35%, #000000 100%)",
-        color: "white",
+          "linear-gradient(180deg, #fff7fb 0%, #ffeef6 35%, #fffaf2 100%)",
+        color: "#6b3153",
         fontFamily: "Arial, sans-serif",
         padding: "24px",
       }}
@@ -22,49 +22,66 @@ export default function Home() {
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <div
           style={{
-            border: "1px solid rgba(255,0,0,0.25)",
-            borderRadius: "20px",
-            padding: "20px 24px",
-            background: "rgba(20,0,0,0.7)",
+            border: "1px solid #f5bfd6",
+            borderRadius: "28px",
+            padding: "24px 28px",
+            background: "rgba(255,255,255,0.85)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             gap: "20px",
             flexWrap: "wrap",
+            boxShadow: "0 10px 30px rgba(244, 182, 210, 0.25)",
           }}
         >
           <div>
             <div
               style={{
-                color: "#ff3b3b",
+                color: "#d96c9d",
                 fontSize: "14px",
                 letterSpacing: "2px",
                 textTransform: "uppercase",
                 marginBottom: "8px",
+                fontWeight: "bold",
               }}
             >
               Tienda digital
             </div>
-            <h1 style={{ margin: 0, fontSize: "38px", color: "#ff2a2a" }}>
+
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "40px",
+                color: "#c95c93",
+              }}
+            >
               COSMICTEAM
             </h1>
-            <p style={{ marginTop: "10px", color: "#d1d5db" }}>
+
+            <p style={{ marginTop: "10px", color: "#8b5d75" }}>
               Servicios digitales, recargas y compras por créditos.
             </p>
           </div>
 
           <div
             style={{
-              background: "#140000",
-              border: "1px solid rgba(255,0,0,0.25)",
-              borderRadius: "16px",
+              background: "#fff8fc",
+              border: "1px solid #f5bfd6",
+              borderRadius: "20px",
               padding: "14px 18px",
               minWidth: "180px",
               textAlign: "right",
+              boxShadow: "0 6px 18px rgba(244, 182, 210, 0.18)",
             }}
           >
-            <div style={{ color: "#bbb", fontSize: "13px" }}>Saldo</div>
-            <div style={{ color: "#ff2a2a", fontSize: "30px", fontWeight: "bold" }}>
+            <div style={{ color: "#9f7389", fontSize: "13px" }}>Saldo</div>
+            <div
+              style={{
+                color: "#d55d95",
+                fontSize: "30px",
+                fontWeight: "bold",
+              }}
+            >
               0 créditos
             </div>
           </div>
@@ -73,23 +90,37 @@ export default function Home() {
         <div
           style={{
             marginTop: "24px",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "20px",
+            border: "1px solid #f7d6e5",
+            borderRadius: "24px",
             padding: "18px 22px",
-            background: "rgba(10,10,10,0.55)",
+            background: "rgba(255,255,255,0.78)",
+            boxShadow: "0 8px 20px rgba(244, 182, 210, 0.14)",
           }}
         >
-          <p style={{ margin: 0, color: "#e5e7eb" }}>
-            Bienvenido a <strong>COSMICTEAM</strong>. Aquí podrás comprar servicios
-            y recargar saldo por transferencia.
+          <p style={{ margin: 0, color: "#8b5d75" }}>
+            Bienvenida a <strong>COSMICTEAM</strong>. Aquí podrás comprar tus
+            servicios y recargar saldo por transferencia.
           </p>
-          <p style={{ marginTop: "8px", color: "#ff6b6b", fontWeight: "bold" }}>
+
+          <p
+            style={{
+              marginTop: "8px",
+              color: "#d96c9d",
+              fontWeight: "bold",
+            }}
+          >
             1 crédito = 1 peso
           </p>
         </div>
 
         <div style={{ marginTop: "34px" }}>
-          <h2 style={{ fontSize: "32px", marginBottom: "18px" }}>
+          <h2
+            style={{
+              fontSize: "32px",
+              marginBottom: "18px",
+              color: "#c95c93",
+            }}
+          >
             Servicios disponibles
           </h2>
 
@@ -104,35 +135,49 @@ export default function Home() {
               <div
                 key={servicio.nombre}
                 style={{
-                  background: "rgba(15,15,15,0.95)",
-                  border: "1px solid rgba(255,0,0,0.28)",
-                  borderRadius: "22px",
+                  background: "rgba(255,255,255,0.92)",
+                  border: "1px solid #f5bfd6",
+                  borderRadius: "26px",
                   overflow: "hidden",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                  boxShadow: "0 10px 24px rgba(244, 182, 210, 0.22)",
                 }}
               >
                 <div
                   style={{
                     height: "170px",
                     background:
-                      "linear-gradient(135deg, #020617 0%, #111827 35%, #7f1d1d 100%)",
+                      "linear-gradient(135deg, #ffd9ea 0%, #fff0f7 45%, #ffe7bf 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: "30px",
                     fontWeight: "bold",
-                    color: "#ffffff",
+                    color: "#c95c93",
+                    textAlign: "center",
+                    padding: "12px",
                   }}
                 >
                   {servicio.nombre}
                 </div>
 
                 <div style={{ padding: "18px" }}>
-                  <h3 style={{ margin: 0, fontSize: "24px" }}>{servicio.nombre}</h3>
-                  <p style={{ color: "#d1d5db", marginTop: "10px" }}>{servicio.info}</p>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: "24px",
+                      color: "#a84d7c",
+                    }}
+                  >
+                    {servicio.nombre}
+                  </h3>
+
+                  <p style={{ color: "#8b5d75", marginTop: "10px" }}>
+                    {servicio.info}
+                  </p>
+
                   <p
                     style={{
-                      color: "#ff2a2a",
+                      color: "#d55d95",
                       fontWeight: "bold",
                       fontSize: "28px",
                       marginTop: "14px",
@@ -145,17 +190,18 @@ export default function Home() {
                     style={{
                       width: "100%",
                       marginTop: "16px",
-                      background: "#e10600",
+                      background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
                       color: "white",
                       border: "none",
-                      borderRadius: "14px",
+                      borderRadius: "16px",
                       padding: "13px",
                       fontWeight: "bold",
                       fontSize: "16px",
                       cursor: "pointer",
+                      boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
                     }}
                   >
-                    Agregar al carrito
+                    Comprar
                   </button>
                 </div>
               </div>
