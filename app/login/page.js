@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [modo, setModo] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -90,16 +92,16 @@ export default function LoginPage() {
       });
 
       if (error) {
-        if (error.message.toLowerCase().includes("email not confirmed")) {
-          setMensaje("Tu cuenta existe, pero Supabase todavía pide confirmación de correo. Hay que desactivar eso en configuración.");
-        } else {
-          setMensaje("No se pudo iniciar sesión: " + error.message);
-        }
+        setMensaje("No se pudo iniciar sesión: " + error.message);
         return;
       }
 
       setMensaje("Bienvenida 💖 Inicio de sesión correcto.");
       limpiarFormulario();
+
+      setTimeout(() => {
+        router.push("/cuenta");
+      }, 800);
     } catch (e) {
       setMensaje("Ocurrió un error inesperado.");
     } finally {
