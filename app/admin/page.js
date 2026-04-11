@@ -7,8 +7,11 @@ export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [pedidos, setPedidos] = useState([]);
+  const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
+  const [saldosEditados, setSaldosEditados] = useState({});
+  const [stocksEditados, setStocksEditados] = useState({});
 
   useEffect(() => {
     const cargarTodo = async () => {
@@ -42,7 +45,14 @@ export default function AdminPage() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      setUsuarios(listaUsuarios || []);
+      const usuariosFinal = listaUsuarios || [];
+      setUsuarios(usuariosFinal);
+
+      const saldosIniciales = {};
+      usuariosFinal.forEach((u) => {
+        saldosIniciales[u.id] = u.balance ?? 0;
+      });
+      setSaldosEditados(saldosIniciales);
 
       const { data: listaPedidos } = await supabase
         .from("orders")
@@ -50,19 +60,34 @@ export default function AdminPage() {
         .order("created_at", { ascending: false });
 
       setPedidos(listaPedidos || []);
+
+      const { data: listaProductos } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      const productosFinal = listaProductos || [];
+      setProductos(productosFinal);
+
+      const stocksIniciales = {};
+      productosFinal.forEach((p) => {
+        stocksIniciales[p.id] = p.stock ?? 0;
+      });
+      setStocksEditados(stocksIniciales);
+
       setCargando(false);
     };
 
     cargarTodo();
   }, []);
 
-  const cambiarSaldo = async (id, saldoActual, cambio) => {
+  const guardarSaldo = async (id) => {
     setMensaje("");
 
-    const nuevoSaldo = Number(saldoActual || 0) + Number(cambio);
+    const nuevoSaldo = Number(saldosEditados[id]);
 
-    if (isNaN(nuevoSaldo)) {
-      setMensaje("Saldo inválido.");
+    if (isNaN(nuevoSaldo) || nuevoSaldo < 0) {
+      setMensaje("El saldo debe ser un número válido mayor o igual a 0.");
       return;
     }
 
@@ -81,6 +106,35 @@ export default function AdminPage() {
     );
 
     setMensaje("Saldo actualizado correctamente 💖");
+  };
+
+  const guardarStock = async (productoId) => {
+    setMensaje("");
+
+    const nuevoStock = Number(stocksEditados[productoId]);
+
+    if (isNaN(nuevoStock) || nuevoStock < 0) {
+      setMensaje("El stock debe ser un número válido mayor o igual a 0.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update({ stock: nuevoStock })
+      .eq("id", productoId);
+
+    if (error) {
+      setMensaje("No se pudo actualizar el stock.");
+      return;
+    }
+
+    setProductos((prev) =>
+      prev.map((producto) =>
+        producto.id === productoId ? { ...producto, stock: nuevoStock } : producto
+      )
+    );
+
+    setMensaje("Stock actualizado correctamente 💖");
   };
 
   const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
@@ -103,6 +157,30 @@ export default function AdminPage() {
     );
 
     setMensaje("Pedido actualizado correctamente 💖");
+  };
+
+  const cambiarActivo = async (productoId, valorActual) => {
+    setMensaje("");
+
+    const nuevoValor = !valorActual;
+
+    const { error } = await supabase
+      .from("products")
+      .update({ active: nuevoValor })
+      .eq("id", productoId);
+
+    if (error) {
+      setMensaje("No se pudo cambiar el estado del producto.");
+      return;
+    }
+
+    setProductos((prev) =>
+      prev.map((producto) =>
+        producto.id === productoId ? { ...producto, active: nuevoValor } : producto
+      )
+    );
+
+    setMensaje("Estado del producto actualizado 💖");
   };
 
   const obtenerUsername = (userId) => {
@@ -177,7 +255,7 @@ export default function AdminPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí puedes ver usuarias, cambiar saldo y revisar pedidos.
+                Desde aquí puedes editar saldo, pedidos y stock manualmente.
               </p>
             </div>
 
@@ -262,54 +340,46 @@ export default function AdminPage() {
                       {usuario.username}
                     </div>
                     <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                      Rol: {usuario.role} · Saldo: {usuario.balance ?? 0} créditos
+                      Rol: {usuario.role}
+                    </div>
+                    <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                      Saldo actual: {usuario.balance ?? 0} créditos
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={saldosEditados[usuario.id] ?? 0}
+                      onChange={(e) =>
+                        setSaldosEditados((prev) => ({
+                          ...prev,
+                          [usuario.id]: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "120px",
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        border: "1px solid #f4c5db",
+                        fontSize: "15px",
+                      }}
+                    />
+
                     <button
-                      onClick={() => cambiarSaldo(usuario.id, usuario.balance, 10)}
+                      onClick={() => guardarSaldo(usuario.id)}
                       style={{
                         border: "none",
                         background: "#e98ab3",
                         color: "white",
                         borderRadius: "12px",
-                        padding: "10px 12px",
+                        padding: "10px 14px",
                         fontWeight: "bold",
                         cursor: "pointer",
                       }}
                     >
-                      +10
-                    </button>
-
-                    <button
-                      onClick={() => cambiarSaldo(usuario.id, usuario.balance, 50)}
-                      style={{
-                        border: "none",
-                        background: "#d96c9d",
-                        color: "white",
-                        borderRadius: "12px",
-                        padding: "10px 12px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                      }}
-                    >
-                      +50
-                    </button>
-
-                    <button
-                      onClick={() => cambiarSaldo(usuario.id, usuario.balance, 100)}
-                      style={{
-                        border: "none",
-                        background: "#c5578b",
-                        color: "white",
-                        borderRadius: "12px",
-                        padding: "10px 12px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                      }}
-                    >
-                      +100
+                      Guardar saldo
                     </button>
                   </div>
                 </div>
@@ -406,6 +476,107 @@ export default function AdminPage() {
                         }}
                       >
                         Cancelado
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              marginTop: "24px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              borderRadius: "22px",
+              padding: "20px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Productos y stock</h2>
+
+            {productos.length === 0 ? (
+              <p style={{ color: "#8d6278" }}>Todavía no hay productos.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "14px" }}>
+                {productos.map((producto) => (
+                  <div
+                    key={producto.id}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #f4c5db",
+                      borderRadius: "18px",
+                      padding: "16px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                        {producto.name}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                        Precio: {producto.price} créditos
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Stock actual: {producto.stock ?? 0}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Estado: {producto.active ? "Activo" : "Oculto"}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        value={stocksEditados[producto.id] ?? 0}
+                        onChange={(e) =>
+                          setStocksEditados((prev) => ({
+                            ...prev,
+                            [producto.id]: e.target.value,
+                          }))
+                        }
+                        style={{
+                          width: "120px",
+                          padding: "10px 12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                        }}
+                      />
+
+                      <button
+                        onClick={() => guardarStock(producto.id)}
+                        style={{
+                          border: "none",
+                          background: "#e98ab3",
+                          color: "white",
+                          borderRadius: "12px",
+                          padding: "10px 14px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Guardar stock
+                      </button>
+
+                      <button
+                        onClick={() => cambiarActivo(producto.id, producto.active)}
+                        style={{
+                          border: "1px solid #f4c5db",
+                          background: "#fff",
+                          color: "#9a6b82",
+                          borderRadius: "12px",
+                          padding: "10px 12px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {producto.active ? "Ocultar" : "Activar"}
                       </button>
                     </div>
                   </div>
