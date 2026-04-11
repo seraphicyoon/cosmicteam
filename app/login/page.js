@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
@@ -12,27 +12,16 @@ export default function LoginPage() {
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
 
-  useEffect(() => {
-    async function revisarSesion() {
-      const { data } = await supabase.auth.getSession();
-      if (data?.session?.user) {
-        router.replace("/cuenta");
-      }
-    }
-
-    revisarSesion();
-  }, [router]);
-
-  const crearEmailInterno = (username) => {
+  function crearEmailInterno(username) {
     return `${username.trim().toLowerCase()}@cosmicteam.com`;
-  };
+  }
 
-  const limpiarFormulario = () => {
+  function limpiarFormulario() {
     setUsername("");
     setPassword("");
-  };
+  }
 
-  const handleRegister = async () => {
+  async function handleRegister() {
     setMensaje("");
 
     if (!username.trim() || !password.trim()) {
@@ -82,9 +71,9 @@ export default function LoginPage() {
     } finally {
       setCargando(false);
     }
-  };
+  }
 
-  const handleLogin = async () => {
+  async function handleLogin() {
     setMensaje("");
 
     if (!username.trim() || !password.trim()) {
@@ -111,14 +100,14 @@ export default function LoginPage() {
       limpiarFormulario();
 
       setTimeout(() => {
-        router.replace("/cuenta");
-      }, 700);
+        router.push("/cuenta");
+      }, 600);
     } catch (e) {
       setMensaje("Ocurrió un error inesperado.");
     } finally {
       setCargando(false);
     }
-  };
+  }
 
   return (
     <main

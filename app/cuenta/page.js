@@ -9,41 +9,60 @@ export default function CuentaPage() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    let activo = true;
+
     async function cargarCuenta() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (userError || !user) {
-        window.location.href = "/login";
-        return;
+        if (!session?.user) {
+          if (activo) {
+            setCargando(false);
+            window.location.href = "/login";
+          }
+          return;
+        }
+
+        const { data: perfilData, error: perfilError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (perfilError || !perfilData) {
+          if (activo) {
+            setCargando(false);
+            window.location.href = "/login";
+          }
+          return;
+        }
+
+        const { data: pedidosData } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false });
+
+        if (!activo) return;
+
+        setPerfil(perfilData);
+        setPedidos(pedidosData || []);
+        setCargando(false);
+      } catch (e) {
+        if (activo) {
+          setCargando(false);
+          window.location.href = "/login";
+        }
       }
-
-      const { data: perfilData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (!perfilData) {
-        window.location.href = "/login";
-        return;
-      }
-
-      setPerfil(perfilData);
-
-      const { data: pedidosData } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      setPedidos(pedidosData || []);
-      setCargando(false);
     }
 
     cargarCuenta();
+
+    return () => {
+      activo = false;
+    };
   }, []);
 
   async function cerrarSesion() {
@@ -53,7 +72,16 @@ export default function CuentaPage() {
 
   if (cargando) {
     return (
-      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Arial, sans-serif",
+          background: "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
+        }}
+      >
         Cargando tu cuenta...
       </main>
     );
