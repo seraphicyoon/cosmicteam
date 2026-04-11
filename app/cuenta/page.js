@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 
 export default function CuentaPage() {
   const [perfil, setPerfil] = useState(null);
+  const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -26,6 +27,13 @@ export default function CuentaPage() {
         setPerfil(data);
       }
 
+      const { data: pedidosData } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", userData.user.id)
+        .order("created_at", { ascending: false });
+
+      setPedidos(pedidosData || []);
       setCargando(false);
     };
 
@@ -248,10 +256,35 @@ export default function CuentaPage() {
               padding: "20px",
             }}
           >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Pedidos</h2>
-            <p style={{ color: "#8d6278" }}>
-              Aquí después pondremos el historial de tus compras y recargas.
-            </p>
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Mis pedidos</h2>
+
+            {pedidos.length === 0 ? (
+              <p style={{ color: "#8d6278" }}>Todavía no tienes pedidos.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "12px" }}>
+                {pedidos.map((pedido) => (
+                  <div
+                    key={pedido.id}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #f4c5db",
+                      borderRadius: "18px",
+                      padding: "16px",
+                    }}
+                  >
+                    <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                      {pedido.product_name}
+                    </div>
+                    <div style={{ color: "#8d6278", marginTop: "8px" }}>
+                      Precio: {pedido.price} créditos
+                    </div>
+                    <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                      Estado: {pedido.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
