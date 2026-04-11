@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [productos, setProductos] = useState([]);
@@ -12,18 +12,30 @@ export default function Home() {
 
   useEffect(() => {
     cargarTodo();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      cargarTodo();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function cargarTodo() {
     setCargando(true);
 
-    const { data: authData } = await supabase.auth.getUser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (authData && authData.user) {
+    if (session?.user) {
       const { data: perfilData } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", authData.user.id)
+        .eq("id", session.user.id)
         .single();
 
       if (perfilData) {
@@ -43,6 +55,8 @@ export default function Home() {
 
     if (!error) {
       setProductos(productosData || []);
+    } else {
+      console.log("Error cargando productos:", error.message);
     }
 
     setCargando(false);
@@ -51,9 +65,11 @@ export default function Home() {
   async function comprarProducto(producto) {
     setMensaje("");
 
-    const { data: authData } = await supabase.auth.getUser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (!authData || !authData.user) {
+    if (!session?.user) {
       window.location.href = "/login";
       return;
     }
@@ -193,8 +209,18 @@ export default function Home() {
           }}
         >
           <p style={{ margin: 0, color: "#8b5d75" }}>
-            Bienvenida a <strong>COSMICTEAM</strong>. Aquí podrás comprar tus
-            servicios y recargar saldo por transferencia.
+            {perfil ? (
+              <>
+                Bienvenida <strong>{perfil.username}</strong> a{" "}
+                <strong>COSMICTEAM</strong>. Aquí podrás comprar tus servicios y
+                recargar saldo por transferencia.
+              </>
+            ) : (
+              <>
+                Bienvenida a <strong>COSMICTEAM</strong>. Aquí podrás comprar tus
+                servicios y recargar saldo por transferencia.
+              </>
+            )}
           </p>
 
           <p
@@ -235,7 +261,8 @@ export default function Home() {
                   href="/login"
                   style={{
                     textDecoration: "none",
-                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                    background:
+                      "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
                     color: "white",
                     padding: "12px 16px",
                     borderRadius: "16px",
@@ -246,20 +273,40 @@ export default function Home() {
                   Iniciar sesión
                 </a>
               ) : (
-                <a
-                  href="/cuenta"
-                  style={{
-                    textDecoration: "none",
-                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
-                    color: "white",
-                    padding: "12px 16px",
-                    borderRadius: "16px",
-                    fontWeight: "bold",
-                    boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
-                  }}
-                >
-                  Mi cuenta
-                </a>
+                <>
+                  <a
+                    href="/cuenta"
+                    style={{
+                      textDecoration: "none",
+                      background:
+                        "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                      color: "white",
+                      padding: "12px 16px",
+                      borderRadius: "16px",
+                      fontWeight: "bold",
+                      boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
+                    }}
+                  >
+                    Mi cuenta
+                  </a>
+
+                  {perfil.role === "admin" ? (
+                    <a
+                      href="/admin"
+                      style={{
+                        textDecoration: "none",
+                        background: "#fff",
+                        color: "#9a6b82",
+                        padding: "12px 16px",
+                        borderRadius: "16px",
+                        fontWeight: "bold",
+                        border: "1px solid #f4c5db",
+                      }}
+                    >
+                      Admin
+                    </a>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
