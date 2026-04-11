@@ -12,6 +12,13 @@ export default function AdminPage() {
   const [mensaje, setMensaje] = useState("");
   const [saldosEditados, setSaldosEditados] = useState({});
   const [stocksEditados, setStocksEditados] = useState({});
+  const [nuevoProducto, setNuevoProducto] = useState({
+    name: "",
+    description: "",
+    price: "",
+    stock: "",
+    active: true,
+  });
 
   useEffect(() => {
     const cargarTodo = async () => {
@@ -137,6 +144,65 @@ export default function AdminPage() {
     setMensaje("Stock actualizado correctamente 💖");
   };
 
+  const crearProducto = async () => {
+    setMensaje("");
+
+    const name = nuevoProducto.name.trim();
+    const description = nuevoProducto.description.trim();
+    const price = Number(nuevoProducto.price);
+    const stock = Number(nuevoProducto.stock);
+
+    if (!name) {
+      setMensaje("Escribe el nombre del producto.");
+      return;
+    }
+
+    if (isNaN(price) || price < 0) {
+      setMensaje("El precio debe ser un número válido.");
+      return;
+    }
+
+    if (isNaN(stock) || stock < 0) {
+      setMensaje("El stock debe ser un número válido.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .insert([
+        {
+          name,
+          description,
+          price,
+          stock,
+          active: nuevoProducto.active,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      setMensaje("No se pudo crear el producto.");
+      return;
+    }
+
+    setProductos((prev) => [data, ...prev]);
+    setStocksEditados((prev) => ({
+      ...prev,
+      [data.id]: data.stock ?? 0,
+    }));
+
+    setNuevoProducto({
+      name: "",
+      description: "",
+      price: "",
+      stock: "",
+      active: true,
+    });
+
+    setMensaje("Producto creado correctamente 💖");
+  };
+
   const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
     setMensaje("");
 
@@ -255,7 +321,7 @@ export default function AdminPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí puedes editar saldo, pedidos y stock manualmente.
+                Desde aquí puedes editar saldo, pedidos, stock y crear productos.
               </p>
             </div>
 
@@ -307,6 +373,138 @@ export default function AdminPage() {
               {mensaje}
             </div>
           ) : null}
+
+          <div
+            style={{
+              marginTop: "24px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              borderRadius: "22px",
+              padding: "20px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Crear producto nuevo</h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Nombre del producto"
+                value={nuevoProducto.name}
+                onChange={(e) =>
+                  setNuevoProducto((prev) => ({ ...prev, name: e.target.value }))
+                }
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid #f4c5db",
+                  fontSize: "15px",
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="Descripción"
+                value={nuevoProducto.description}
+                onChange={(e) =>
+                  setNuevoProducto((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid #f4c5db",
+                  fontSize: "15px",
+                }}
+              />
+
+              <input
+                type="number"
+                min="0"
+                placeholder="Precio"
+                value={nuevoProducto.price}
+                onChange={(e) =>
+                  setNuevoProducto((prev) => ({ ...prev, price: e.target.value }))
+                }
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid #f4c5db",
+                  fontSize: "15px",
+                }}
+              />
+
+              <input
+                type="number"
+                min="0"
+                placeholder="Stock"
+                value={nuevoProducto.stock}
+                onChange={(e) =>
+                  setNuevoProducto((prev) => ({ ...prev, stock: e.target.value }))
+                }
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "1px solid #f4c5db",
+                  fontSize: "15px",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                marginTop: "14px",
+                display: "flex",
+                gap: "12px",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#8d6278",
+                  fontWeight: "bold",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={nuevoProducto.active}
+                  onChange={(e) =>
+                    setNuevoProducto((prev) => ({
+                      ...prev,
+                      active: e.target.checked,
+                    }))
+                  }
+                />
+                Activo
+              </label>
+
+              <button
+                onClick={crearProducto}
+                style={{
+                  border: "none",
+                  background: "#e98ab3",
+                  color: "white",
+                  borderRadius: "12px",
+                  padding: "12px 16px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Crear producto
+              </button>
+            </div>
+          </div>
 
           <div
             style={{
