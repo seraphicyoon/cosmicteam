@@ -12,23 +12,33 @@ export default function Home() {
 
   useEffect(() => {
     cargarTodo();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      cargarTodo();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const cargarTodo = async () => {
+  async function cargarTodo() {
     setCargando(true);
 
-    const { data: authData } = await supabase.auth.getUser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (authData?.user) {
+    if (session?.user) {
       const { data: perfilData } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", authData.user.id)
+        .eq("id", session.user.id)
         .single();
 
-      if (perfilData) {
-        setPerfil(perfilData);
-      }
+      setPerfil(perfilData || null);
     } else {
       setPerfil(null);
     }
@@ -41,107 +51,50 @@ export default function Home() {
 
     if (!error) {
       setProductos(productosData || []);
+    } else {
+      setProductos([]);
     }
 
     setCargando(false);
-  };
+  }
 
-  const comprarProducto = async (producto) => {
+  async function comprarProducto(producto) {
     setMensaje("");
 
-    const { data: authData } = await supabase.auth.getUser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (!authData?.user) {
+    if (!session?.user) {
       window.location.href = "/login";
-      return;
-    }
-
-    if (!perfil) {
-      setMensaje("No se pudo cargar tu perfil.");
-      return;
-    }
-
-    if ((producto.stock ?? 0) <= 0) {
-      setMensaje("Este producto está agotado.");
-      return;
-    }
-
-    if ((perfil.balance ?? 0) < producto.price) {
-      setMensaje("No tienes saldo suficiente para comprar este producto.");
       return;
     }
 
     try {
       setComprandoId(producto.id);
 
-      const nuevoSaldo = Number(perfil.balance) - Number(producto.price);
-      const nuevoStock = Number(producto.stock) - 1;
+      const { data, error } = await supabase.rpc("buy_product", {
+        p_product_id: producto.id,
+      });
 
-      const { error: saldoError } = await supabase
-        .from("profiles")
-        .update({ balance: nuevoSaldo })
-        .eq("id", perfil.id);
-
-      if (saldoError) {
-        setMensaje("No se pudo descontar el saldo.");
+      if (error) {
+        setMensaje("No se pudo completar la compra: " + error.message);
         return;
       }
 
-      const { error: stockError } = await supabase
-        .from("products")
-        .update({ stock: nuevoStock })
-        .eq("id", producto.id);
-
-      if (stockError) {
-        setMensaje("No se pudo actualizar el stock.");
-        return;
-      }
-
-      const { error: orderError } = await supabase.from("orders").insert([
-        {
-          user_id: perfil.id,
-          product_name: producto.name,
-          price: producto.price,
-          status: "pendiente",
-        },
-      ]);
-
-      if (orderError) {
-        setMensaje("La compra se hizo, pero no se pudo guardar la orden.");
-        return;
-      }
-
-      const { error: movementError } = await supabase.from("wallet_movements").insert([
-        {
-          user_id: perfil.id,
-          amount: -Number(producto.price),
-          type: "compra",
-          description: `Compra de ${producto.name}`,
-        },
-      ]);
-
-      if (movementError) {
-        console.log("No se pudo guardar el movimiento");
-      }
-
-      setMensaje(`Compra realizada con éxito 💖 Te contactaremos por WhatsApp para entregar: ${producto.name}`);
-
-      setPerfil((prev) => ({
-        ...prev,
-        balance: nuevoSaldo,
-      }));
-
-      setProductos((prev) =>
-        prev.map((p) =>
-          p.id === producto.id ? { ...p, stock: nuevoStock } : p
-        )
+      setMensaje(
+        "Compra realizada con éxito 💖 Tu pedido de " +
+          (data?.product_name || producto.name) +
+          " fue registrado."
       );
+
+      await cargarTodo();
     } catch (e) {
       setMensaje("Ocurrió un error inesperado al comprar.");
     } finally {
       setComprandoId(null);
     }
-  };
+  }
 
   return (
     <main
@@ -210,7 +163,7 @@ export default function Home() {
             }}
           >
             <div style={{ color: "#9f7389", fontSize: "13px" }}>
-              {perfil ? `Saldo de ${perfil.username}` : "Saldo"}
+              {perfil ? "Saldo de " + perfil.username : "Saldo"}
             </div>
             <div
               style={{
@@ -219,7 +172,7 @@ export default function Home() {
                 fontWeight: "bold",
               }}
             >
-              {perfil ? `${perfil.balance ?? 0} créditos` : "Inicia sesión"}
+              {perfil ? (perfil.balance ?? 0) + " créditos" : "Inicia sesión"}
             </div>
           </div>
         </div>
@@ -252,8 +205,16 @@ export default function Home() {
           }}
         >
           <p style={{ margin: 0, color: "#8b5d75" }}>
-            Bienvenida a <strong>COSMICTEAM</strong>. Aquí podrás comprar tus
-            servicios y recargar saldo por transferencia.
+            {perfil ? (
+              <>
+                Bienvenida <strong>{perfil.username}</strong> a{" "}
+                <strong>COSMICTEAM</strong>.
+              </>
+            ) : (
+              <>
+                Bienvenida a <strong>COSMICTEAM</strong>.
+              </>
+            )}
           </p>
 
           <p
@@ -294,31 +255,50 @@ export default function Home() {
                   href="/login"
                   style={{
                     textDecoration: "none",
-                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                    background:
+                      "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
                     color: "white",
                     padding: "12px 16px",
                     borderRadius: "16px",
                     fontWeight: "bold",
-                    boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
                   }}
                 >
                   Iniciar sesión
                 </a>
               ) : (
-                <a
-                  href="/cuenta"
-                  style={{
-                    textDecoration: "none",
-                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
-                    color: "white",
-                    padding: "12px 16px",
-                    borderRadius: "16px",
-                    fontWeight: "bold",
-                    boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
-                  }}
-                >
-                  Mi cuenta
-                </a>
+                <>
+                  <a
+                    href="/cuenta"
+                    style={{
+                      textDecoration: "none",
+                      background:
+                        "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                      color: "white",
+                      padding: "12px 16px",
+                      borderRadius: "16px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Mi cuenta
+                  </a>
+
+                  {perfil.role === "admin" ? (
+                    <a
+                      href="/admin"
+                      style={{
+                        textDecoration: "none",
+                        background: "#fff",
+                        color: "#9a6b82",
+                        padding: "12px 16px",
+                        borderRadius: "16px",
+                        fontWeight: "bold",
+                        border: "1px solid #f4c5db",
+                      }}
+                    >
+                      Admin
+                    </a>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
@@ -408,7 +388,7 @@ export default function Home() {
                       }}
                     >
                       {producto.stock > 0
-                        ? `Stock disponible: ${producto.stock}`
+                        ? "Stock disponible: " + producto.stock
                         : "Agotado"}
                     </p>
 
@@ -416,8 +396,6 @@ export default function Home() {
                       onClick={() => comprarProducto(producto)}
                       disabled={producto.stock <= 0 || comprandoId === producto.id}
                       style={{
-                        display: "block",
-                        textAlign: "center",
                         width: "100%",
                         marginTop: "16px",
                         background:
@@ -430,7 +408,6 @@ export default function Home() {
                         padding: "13px",
                         fontWeight: "bold",
                         fontSize: "16px",
-                        boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
                         cursor: producto.stock > 0 ? "pointer" : "not-allowed",
                       }}
                     >
