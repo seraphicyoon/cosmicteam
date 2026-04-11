@@ -6,24 +6,142 @@ import { supabase } from "../lib/supabase";
 export default function Home() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [perfil, setPerfil] = useState(null);
+  const [mensaje, setMensaje] = useState("");
+  const [comprandoId, setComprandoId] = useState(null);
 
   useEffect(() => {
-    const cargarProductos = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("active", true)
-        .order("created_at", { ascending: false });
+    cargarTodo();
+  }, []);
 
-      if (!error) {
-        setProductos(data || []);
+  const cargarTodo = async () => {
+    setCargando(true);
+
+    const { data: authData } = await supabase.auth.getUser();
+
+    if (authData?.user) {
+      const { data: perfilData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (perfilData) {
+        setPerfil(perfilData);
+      }
+    } else {
+      setPerfil(null);
+    }
+
+    const { data: productosData, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      setProductos(productosData || []);
+    }
+
+    setCargando(false);
+  };
+
+  const comprarProducto = async (producto) => {
+    setMensaje("");
+
+    const { data: authData } = await supabase.auth.getUser();
+
+    if (!authData?.user) {
+      window.location.href = "/login";
+      return;
+    }
+
+    if (!perfil) {
+      setMensaje("No se pudo cargar tu perfil.");
+      return;
+    }
+
+    if ((producto.stock ?? 0) <= 0) {
+      setMensaje("Este producto está agotado.");
+      return;
+    }
+
+    if ((perfil.balance ?? 0) < producto.price) {
+      setMensaje("No tienes saldo suficiente para comprar este producto.");
+      return;
+    }
+
+    try {
+      setComprandoId(producto.id);
+
+      const nuevoSaldo = Number(perfil.balance) - Number(producto.price);
+      const nuevoStock = Number(producto.stock) - 1;
+
+      const { error: saldoError } = await supabase
+        .from("profiles")
+        .update({ balance: nuevoSaldo })
+        .eq("id", perfil.id);
+
+      if (saldoError) {
+        setMensaje("No se pudo descontar el saldo.");
+        return;
       }
 
-      setCargando(false);
-    };
+      const { error: stockError } = await supabase
+        .from("products")
+        .update({ stock: nuevoStock })
+        .eq("id", producto.id);
 
-    cargarProductos();
-  }, []);
+      if (stockError) {
+        setMensaje("No se pudo actualizar el stock.");
+        return;
+      }
+
+      const { error: orderError } = await supabase.from("orders").insert([
+        {
+          user_id: perfil.id,
+          product_name: producto.name,
+          price: producto.price,
+          status: "pendiente",
+        },
+      ]);
+
+      if (orderError) {
+        setMensaje("La compra se hizo, pero no se pudo guardar la orden.");
+        return;
+      }
+
+      const { error: movementError } = await supabase.from("wallet_movements").insert([
+        {
+          user_id: perfil.id,
+          amount: -Number(producto.price),
+          type: "compra",
+          description: `Compra de ${producto.name}`,
+        },
+      ]);
+
+      if (movementError) {
+        console.log("No se pudo guardar el movimiento");
+      }
+
+      setMensaje(`Compra realizada con éxito 💖 Te contactaremos por WhatsApp para entregar: ${producto.name}`);
+
+      setPerfil((prev) => ({
+        ...prev,
+        balance: nuevoSaldo,
+      }));
+
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === producto.id ? { ...p, stock: nuevoStock } : p
+        )
+      );
+    } catch (e) {
+      setMensaje("Ocurrió un error inesperado al comprar.");
+    } finally {
+      setComprandoId(null);
+    }
+  };
 
   return (
     <main
@@ -86,12 +204,14 @@ export default function Home() {
               border: "1px solid #f5bfd6",
               borderRadius: "20px",
               padding: "14px 18px",
-              minWidth: "180px",
+              minWidth: "220px",
               textAlign: "right",
               boxShadow: "0 6px 18px rgba(244, 182, 210, 0.18)",
             }}
           >
-            <div style={{ color: "#9f7389", fontSize: "13px" }}>Saldo</div>
+            <div style={{ color: "#9f7389", fontSize: "13px" }}>
+              {perfil ? `Saldo de ${perfil.username}` : "Saldo"}
+            </div>
             <div
               style={{
                 color: "#d55d95",
@@ -99,10 +219,27 @@ export default function Home() {
                 fontWeight: "bold",
               }}
             >
-              Inicia sesión
+              {perfil ? `${perfil.balance ?? 0} créditos` : "Inicia sesión"}
             </div>
           </div>
         </div>
+
+        {mensaje ? (
+          <div
+            style={{
+              marginTop: "18px",
+              padding: "14px",
+              borderRadius: "16px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              color: "#8a4f6e",
+              fontSize: "14px",
+              lineHeight: 1.5,
+            }}
+          >
+            {mensaje}
+          </div>
+        ) : null}
 
         <div
           style={{
@@ -151,20 +288,39 @@ export default function Home() {
               Servicios disponibles
             </h2>
 
-            <a
-              href="/login"
-              style={{
-                textDecoration: "none",
-                background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
-                color: "white",
-                padding: "12px 16px",
-                borderRadius: "16px",
-                fontWeight: "bold",
-                boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
-              }}
-            >
-              Iniciar sesión
-            </a>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {!perfil ? (
+                <a
+                  href="/login"
+                  style={{
+                    textDecoration: "none",
+                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                    color: "white",
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    fontWeight: "bold",
+                    boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
+                  }}
+                >
+                  Iniciar sesión
+                </a>
+              ) : (
+                <a
+                  href="/cuenta"
+                  style={{
+                    textDecoration: "none",
+                    background: "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                    color: "white",
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    fontWeight: "bold",
+                    boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
+                  }}
+                >
+                  Mi cuenta
+                </a>
+              )}
+            </div>
           </div>
 
           {cargando ? (
@@ -256,16 +412,18 @@ export default function Home() {
                         : "Agotado"}
                     </p>
 
-                    <a
-                      href="/login"
+                    <button
+                      onClick={() => comprarProducto(producto)}
+                      disabled={producto.stock <= 0 || comprandoId === producto.id}
                       style={{
                         display: "block",
                         textAlign: "center",
-                        textDecoration: "none",
                         width: "100%",
                         marginTop: "16px",
                         background:
-                          "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                          producto.stock > 0
+                            ? "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)"
+                            : "#e6c7d7",
                         color: "white",
                         border: "none",
                         borderRadius: "16px",
@@ -273,10 +431,15 @@ export default function Home() {
                         fontWeight: "bold",
                         fontSize: "16px",
                         boxShadow: "0 8px 18px rgba(233, 127, 176, 0.28)",
+                        cursor: producto.stock > 0 ? "pointer" : "not-allowed",
                       }}
                     >
-                      Comprar
-                    </a>
+                      {comprandoId === producto.id
+                        ? "Procesando..."
+                        : producto.stock > 0
+                        ? "Comprar"
+                        : "Agotado"}
+                    </button>
                   </div>
                 </div>
               ))}
