@@ -11,7 +11,7 @@ export default function AdminPage() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [saldosEditados, setSaldosEditados] = useState({});
-  const [stocksEditados, setStocksEditados] = useState({});
+  const [productosEditados, setProductosEditados] = useState({});
   const [nuevoProducto, setNuevoProducto] = useState({
     name: "",
     description: "",
@@ -76,11 +76,17 @@ export default function AdminPage() {
       const productosFinal = listaProductos || [];
       setProductos(productosFinal);
 
-      const stocksIniciales = {};
+      const productosIniciales = {};
       productosFinal.forEach((p) => {
-        stocksIniciales[p.id] = p.stock ?? 0;
+        productosIniciales[p.id] = {
+          name: p.name || "",
+          description: p.description || "",
+          price: p.price ?? 0,
+          stock: p.stock ?? 0,
+          active: !!p.active,
+        };
       });
-      setStocksEditados(stocksIniciales);
+      setProductosEditados(productosIniciales);
 
       setCargando(false);
     };
@@ -113,35 +119,6 @@ export default function AdminPage() {
     );
 
     setMensaje("Saldo actualizado correctamente 💖");
-  };
-
-  const guardarStock = async (productoId) => {
-    setMensaje("");
-
-    const nuevoStock = Number(stocksEditados[productoId]);
-
-    if (isNaN(nuevoStock) || nuevoStock < 0) {
-      setMensaje("El stock debe ser un número válido mayor o igual a 0.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("products")
-      .update({ stock: nuevoStock })
-      .eq("id", productoId);
-
-    if (error) {
-      setMensaje("No se pudo actualizar el stock.");
-      return;
-    }
-
-    setProductos((prev) =>
-      prev.map((producto) =>
-        producto.id === productoId ? { ...producto, stock: nuevoStock } : producto
-      )
-    );
-
-    setMensaje("Stock actualizado correctamente 💖");
   };
 
   const crearProducto = async () => {
@@ -187,9 +164,15 @@ export default function AdminPage() {
     }
 
     setProductos((prev) => [data, ...prev]);
-    setStocksEditados((prev) => ({
+    setProductosEditados((prev) => ({
       ...prev,
-      [data.id]: data.stock ?? 0,
+      [data.id]: {
+        name: data.name || "",
+        description: data.description || "",
+        price: data.price ?? 0,
+        stock: data.stock ?? 0,
+        active: !!data.active,
+      },
     }));
 
     setNuevoProducto({
@@ -201,6 +184,70 @@ export default function AdminPage() {
     });
 
     setMensaje("Producto creado correctamente 💖");
+  };
+
+  const guardarProducto = async (productoId) => {
+    setMensaje("");
+
+    const producto = productosEditados[productoId];
+    if (!producto) {
+      setMensaje("No se encontró el producto a editar.");
+      return;
+    }
+
+    const name = String(producto.name || "").trim();
+    const description = String(producto.description || "").trim();
+    const price = Number(producto.price);
+    const stock = Number(producto.stock);
+    const active = !!producto.active;
+
+    if (!name) {
+      setMensaje("El producto debe tener nombre.");
+      return;
+    }
+
+    if (isNaN(price) || price < 0) {
+      setMensaje("El precio debe ser un número válido.");
+      return;
+    }
+
+    if (isNaN(stock) || stock < 0) {
+      setMensaje("El stock debe ser un número válido.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        name,
+        description,
+        price,
+        stock,
+        active,
+      })
+      .eq("id", productoId);
+
+    if (error) {
+      setMensaje("No se pudo guardar el producto.");
+      return;
+    }
+
+    setProductos((prev) =>
+      prev.map((p) =>
+        p.id === productoId
+          ? {
+              ...p,
+              name,
+              description,
+              price,
+              stock,
+              active,
+            }
+          : p
+      )
+    );
+
+    setMensaje("Producto actualizado correctamente 💖");
   };
 
   const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
@@ -223,30 +270,6 @@ export default function AdminPage() {
     );
 
     setMensaje("Pedido actualizado correctamente 💖");
-  };
-
-  const cambiarActivo = async (productoId, valorActual) => {
-    setMensaje("");
-
-    const nuevoValor = !valorActual;
-
-    const { error } = await supabase
-      .from("products")
-      .update({ active: nuevoValor })
-      .eq("id", productoId);
-
-    if (error) {
-      setMensaje("No se pudo cambiar el estado del producto.");
-      return;
-    }
-
-    setProductos((prev) =>
-      prev.map((producto) =>
-        producto.id === productoId ? { ...producto, active: nuevoValor } : producto
-      )
-    );
-
-    setMensaje("Estado del producto actualizado 💖");
   };
 
   const obtenerUsername = (userId) => {
@@ -321,7 +344,7 @@ export default function AdminPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí puedes editar saldo, pedidos, stock y crear productos.
+                Desde aquí puedes editar saldo, pedidos y productos completos.
               </p>
             </div>
 
@@ -691,7 +714,7 @@ export default function AdminPage() {
               padding: "20px",
             }}
           >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Productos y stock</h2>
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Editar productos</h2>
 
             {productos.length === 0 ? (
               <p style={{ color: "#8d6278" }}>Todavía no hay productos.</p>
@@ -705,50 +728,138 @@ export default function AdminPage() {
                       border: "1px solid #f4c5db",
                       borderRadius: "18px",
                       padding: "16px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      flexWrap: "wrap",
                     }}
                   >
-                    <div>
-                      <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                        {producto.name}
-                      </div>
-                      <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                        Precio: {producto.price} créditos
-                      </div>
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Stock actual: {producto.stock ?? 0}
-                      </div>
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Estado: {producto.active ? "Activo" : "Oculto"}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                        gap: "12px",
+                      }}
+                    >
                       <input
-                        type="number"
-                        min="0"
-                        value={stocksEditados[producto.id] ?? 0}
+                        type="text"
+                        value={productosEditados[producto.id]?.name ?? ""}
                         onChange={(e) =>
-                          setStocksEditados((prev) => ({
+                          setProductosEditados((prev) => ({
                             ...prev,
-                            [producto.id]: e.target.value,
+                            [producto.id]: {
+                              ...prev[producto.id],
+                              name: e.target.value,
+                            },
                           }))
                         }
+                        placeholder="Nombre"
                         style={{
-                          width: "120px",
-                          padding: "10px 12px",
+                          padding: "12px",
                           borderRadius: "12px",
                           border: "1px solid #f4c5db",
                           fontSize: "15px",
                         }}
                       />
 
+                      <input
+                        type="text"
+                        value={productosEditados[producto.id]?.description ?? ""}
+                        onChange={(e) =>
+                          setProductosEditados((prev) => ({
+                            ...prev,
+                            [producto.id]: {
+                              ...prev[producto.id],
+                              description: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Descripción"
+                        style={{
+                          padding: "12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                        }}
+                      />
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={productosEditados[producto.id]?.price ?? 0}
+                        onChange={(e) =>
+                          setProductosEditados((prev) => ({
+                            ...prev,
+                            [producto.id]: {
+                              ...prev[producto.id],
+                              price: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Precio"
+                        style={{
+                          padding: "12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                        }}
+                      />
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={productosEditados[producto.id]?.stock ?? 0}
+                        onChange={(e) =>
+                          setProductosEditados((prev) => ({
+                            ...prev,
+                            [producto.id]: {
+                              ...prev[producto.id],
+                              stock: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Stock"
+                        style={{
+                          padding: "12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: "14px",
+                        display: "flex",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          color: "#8d6278",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!productosEditados[producto.id]?.active}
+                          onChange={(e) =>
+                            setProductosEditados((prev) => ({
+                              ...prev,
+                              [producto.id]: {
+                                ...prev[producto.id],
+                                active: e.target.checked,
+                              },
+                            }))
+                          }
+                        />
+                        Activo
+                      </label>
+
                       <button
-                        onClick={() => guardarStock(producto.id)}
+                        onClick={() => guardarProducto(producto.id)}
                         style={{
                           border: "none",
                           background: "#e98ab3",
@@ -759,22 +870,7 @@ export default function AdminPage() {
                           cursor: "pointer",
                         }}
                       >
-                        Guardar stock
-                      </button>
-
-                      <button
-                        onClick={() => cambiarActivo(producto.id, producto.active)}
-                        style={{
-                          border: "1px solid #f4c5db",
-                          background: "#fff",
-                          color: "#9a6b82",
-                          borderRadius: "12px",
-                          padding: "10px 12px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {producto.active ? "Ocultar" : "Activar"}
+                        Guardar producto
                       </button>
                     </div>
                   </div>
