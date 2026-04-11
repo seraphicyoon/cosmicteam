@@ -143,11 +143,26 @@ export default function CuentaPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí podrás revisar tu saldo y tus compras.
+                Desde aquí podrás revisar tu saldo, recargar y ver tus compras.
               </p>
             </div>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <a
+                href="/"
+                style={{
+                  textDecoration: "none",
+                  background: "#fff",
+                  color: "#9a6b82",
+                  padding: "12px 16px",
+                  borderRadius: "14px",
+                  fontWeight: "bold",
+                  border: "1px solid #f4c5db",
+                }}
+              >
+                Ir a la tienda
+              </a>
+
               {perfil?.role === "admin" ? (
                 <a
                   href="/admin"
@@ -220,6 +235,83 @@ export default function CuentaPage() {
               <h3 style={{ margin: "10px 0 0 0", color: "#c5578b", fontSize: "26px" }}>
                 {perfil?.balance ?? 0} créditos
               </h3>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: "24px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              borderRadius: "22px",
+              padding: "20px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Recargar saldo</h2>
+
+            <p style={{ color: "#8d6278", lineHeight: 1.7 }}>
+              Para recargar tu saldo, únete al grupo de WhatsApp y solicita los datos
+              bancarios para hacer tu transferencia.
+            </p>
+
+            <div
+              style={{
+                background: "#fffdff",
+                border: "1px solid #f4c5db",
+                borderRadius: "18px",
+                padding: "16px",
+                color: "#8d6278",
+                lineHeight: 1.8,
+              }}
+            >
+              <strong style={{ color: "#c5578b" }}>Instrucciones:</strong>
+              <br />
+              1. Únete al grupo de WhatsApp.
+              <br />
+              2. Pide los datos bancarios de transferencia.
+              <br />
+              3. Realiza tu pago.
+              <br />
+              4. Envía en el grupo tu comprobante de pago.
+              <br />
+              5. Escribe también tu nombre de usuario:
+              <br />
+              <strong style={{ color: "#c5578b" }}>{username}</strong>
+              <br />
+              6. Un administrador revisará tu pago y añadirá el saldo a tu cuenta.
+            </div>
+
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "16px" }}>
+              <a
+                href="https://chat.whatsapp.com/AQUI_TU_LINK_DEL_GRUPO"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  textDecoration: "none",
+                  background: "#e98ab3",
+                  color: "white",
+                  padding: "12px 16px",
+                  borderRadius: "14px",
+                  fontWeight: "bold",
+                }}
+              >
+                Unirme al grupo de WhatsApp
+              </a>
+
+              <a
+                href="/"
+                style={{
+                  textDecoration: "none",
+                  background: "#fff",
+                  color: "#9a6b82",
+                  padding: "12px 16px",
+                  borderRadius: "14px",
+                  fontWeight: "bold",
+                  border: "1px solid #f4c5db",
+                }}
+              >
+                Ir a la tienda
+              </a>
             </div>
           </div>
 
