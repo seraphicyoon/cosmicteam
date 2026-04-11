@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
@@ -11,6 +11,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    async function revisarSesion() {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        router.replace("/cuenta");
+      }
+    }
+
+    revisarSesion();
+  }, [router]);
 
   const crearEmailInterno = (username) => {
     return `${username.trim().toLowerCase()}@cosmicteam.com`;
@@ -100,8 +111,8 @@ export default function LoginPage() {
       limpiarFormulario();
 
       setTimeout(() => {
-        router.push("/cuenta");
-      }, 800);
+        router.replace("/cuenta");
+      }, 700);
     } catch (e) {
       setMensaje("Ocurrió un error inesperado.");
     } finally {
@@ -316,20 +327,6 @@ export default function LoginPage() {
             {mensaje}
           </div>
         ) : null}
-
-        <div
-          style={{
-            marginTop: "20px",
-            textAlign: "center",
-            color: "#a47a8f",
-            fontSize: "13px",
-            lineHeight: 1.5,
-          }}
-        >
-          {modo === "registro"
-            ? "Recuerda bien tu usuario y contraseña para entrar después."
-            : "Si aún no tienes cuenta, cambia a la pestaña de registrarse."}
-        </div>
       </div>
     </main>
   );
