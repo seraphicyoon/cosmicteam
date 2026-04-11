@@ -281,6 +281,42 @@ export default function CuentaPage() {
                     <div style={{ color: "#8d6278", marginTop: "4px" }}>
                       Estado: {pedido.status}
                     </div>
+
+                    {pedido.delivery_message ? (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          padding: "12px",
+                          borderRadius: "12px",
+                          background: "#fff7fb",
+                          border: "1px solid #f4c5db",
+                          color: "#8d6278",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        <strong style={{ color: "#c5578b" }}>Entrega:</strong>
+                        <br />
+                        {pedido.delivery_message}
+                      </div>
+                    ) : null}
+
+                    {pedido.admin_comment ? (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          padding: "12px",
+                          borderRadius: "12px",
+                          background: "#fff7fb",
+                          border: "1px solid #f4c5db",
+                          color: "#8d6278",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        <strong style={{ color: "#c5578b" }}>Comentario:</strong>
+                        <br />
+                        {pedido.admin_comment}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

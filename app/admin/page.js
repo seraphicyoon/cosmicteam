@@ -12,6 +12,7 @@ export default function AdminPage() {
   const [mensaje, setMensaje] = useState("");
   const [saldosEditados, setSaldosEditados] = useState({});
   const [productosEditados, setProductosEditados] = useState({});
+  const [pedidosEditados, setPedidosEditados] = useState({});
   const [nuevoProducto, setNuevoProducto] = useState({
     name: "",
     description: "",
@@ -66,7 +67,17 @@ export default function AdminPage() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      setPedidos(listaPedidos || []);
+      const pedidosFinal = listaPedidos || [];
+      setPedidos(pedidosFinal);
+
+      const pedidosIniciales = {};
+      pedidosFinal.forEach((p) => {
+        pedidosIniciales[p.id] = {
+          delivery_message: p.delivery_message || "",
+          admin_comment: p.admin_comment || "",
+        };
+      });
+      setPedidosEditados(pedidosIniciales);
 
       const { data: listaProductos } = await supabase
         .from("products")
@@ -270,6 +281,37 @@ export default function AdminPage() {
     );
 
     setMensaje("Pedido actualizado correctamente 💖");
+  };
+
+  const guardarDetallePedido = async (pedidoId) => {
+    setMensaje("");
+
+    const detalle = pedidosEditados[pedidoId] || {};
+    const delivery_message = String(detalle.delivery_message || "").trim();
+    const admin_comment = String(detalle.admin_comment || "").trim();
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        delivery_message,
+        admin_comment,
+      })
+      .eq("id", pedidoId);
+
+    if (error) {
+      setMensaje("No se pudo guardar la información del pedido.");
+      return;
+    }
+
+    setPedidos((prev) =>
+      prev.map((pedido) =>
+        pedido.id === pedidoId
+          ? { ...pedido, delivery_message, admin_comment }
+          : pedido
+      )
+    );
+
+    setMensaje("Información del pedido guardada correctamente 💖");
   };
 
   const obtenerUsername = (userId) => {
@@ -631,73 +673,203 @@ export default function AdminPage() {
                       border: "1px solid #f4c5db",
                       borderRadius: "18px",
                       padding: "16px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      flexWrap: "wrap",
                     }}
                   >
-                    <div>
-                      <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                        {pedido.product_name}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "16px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                          {pedido.product_name}
+                        </div>
+                        <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                          Usuaria: {obtenerUsername(pedido.user_id)}
+                        </div>
+                        <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                          Precio: {pedido.price} créditos
+                        </div>
+                        <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                          Estado: {pedido.status}
+                        </div>
                       </div>
-                      <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                        Usuaria: {obtenerUsername(pedido.user_id)}
-                      </div>
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Precio: {pedido.price} créditos
-                      </div>
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Estado: {pedido.status}
+
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => cambiarEstadoPedido(pedido.id, "Pendiente")}
+                          style={{
+                            border: "none",
+                            background: "#f3a1c7",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Pendiente
+                        </button>
+
+                        <button
+                          onClick={() => cambiarEstadoPedido(pedido.id, "Verificando")}
+                          style={{
+                            border: "none",
+                            background: "#e98ab3",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Verificando
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            cambiarEstadoPedido(pedido.id, "Esperando para tomar Orden")
+                          }
+                          style={{
+                            border: "none",
+                            background: "#d96c9d",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Esperando para tomar Orden
+                        </button>
+
+                        <button
+                          onClick={() => cambiarEstadoPedido(pedido.id, "Preparacion")}
+                          style={{
+                            border: "none",
+                            background: "#c5578b",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Preparacion
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            cambiarEstadoPedido(
+                              pedido.id,
+                              "Entrega (El Vendedor ha enviado)"
+                            )
+                          }
+                          style={{
+                            border: "none",
+                            background: "#b84d82",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Entrega
+                        </button>
+
+                        <button
+                          onClick={() => cambiarEstadoPedido(pedido.id, "Cancelado")}
+                          style={{
+                            border: "none",
+                            background: "#94456b",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Cancelado
+                        </button>
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => cambiarEstadoPedido(pedido.id, "pendiente")}
+                    <div
+                      style={{
+                        marginTop: "16px",
+                        display: "grid",
+                        gap: "12px",
+                      }}
+                    >
+                      <textarea
+                        placeholder="Mensaje de entrega opcional: cuenta, contraseña, instrucciones, etc."
+                        value={pedidosEditados[pedido.id]?.delivery_message ?? ""}
+                        onChange={(e) =>
+                          setPedidosEditados((prev) => ({
+                            ...prev,
+                            [pedido.id]: {
+                              ...prev[pedido.id],
+                              delivery_message: e.target.value,
+                            },
+                          }))
+                        }
+                        rows={4}
                         style={{
-                          border: "none",
-                          background: "#f3a1c7",
-                          color: "white",
+                          width: "100%",
+                          padding: "12px",
                           borderRadius: "12px",
-                          padding: "10px 12px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                          resize: "vertical",
+                          boxSizing: "border-box",
                         }}
-                      >
-                        Pendiente
-                      </button>
+                      />
 
-                      <button
-                        onClick={() => cambiarEstadoPedido(pedido.id, "entregado")}
+                      <textarea
+                        placeholder="Comentario opcional para la clienta"
+                        value={pedidosEditados[pedido.id]?.admin_comment ?? ""}
+                        onChange={(e) =>
+                          setPedidosEditados((prev) => ({
+                            ...prev,
+                            [pedido.id]: {
+                              ...prev[pedido.id],
+                              admin_comment: e.target.value,
+                            },
+                          }))
+                        }
+                        rows={3}
                         style={{
-                          border: "none",
-                          background: "#d96c9d",
-                          color: "white",
+                          width: "100%",
+                          padding: "12px",
                           borderRadius: "12px",
-                          padding: "10px 12px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
+                          resize: "vertical",
+                          boxSizing: "border-box",
                         }}
-                      >
-                        Entregado
-                      </button>
+                      />
 
-                      <button
-                        onClick={() => cambiarEstadoPedido(pedido.id, "cancelado")}
-                        style={{
-                          border: "none",
-                          background: "#c5578b",
-                          color: "white",
-                          borderRadius: "12px",
-                          padding: "10px 12px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Cancelado
-                      </button>
+                      <div>
+                        <button
+                          onClick={() => guardarDetallePedido(pedido.id)}
+                          style={{
+                            border: "none",
+                            background: "#e98ab3",
+                            color: "white",
+                            borderRadius: "12px",
+                            padding: "10px 14px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Guardar info del pedido
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
