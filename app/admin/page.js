@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
 
@@ -42,6 +43,13 @@ export default function AdminPage() {
         .order("created_at", { ascending: false });
 
       setUsuarios(listaUsuarios || []);
+
+      const { data: listaPedidos } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      setPedidos(listaPedidos || []);
       setCargando(false);
     };
 
@@ -69,12 +77,37 @@ export default function AdminPage() {
     }
 
     setUsuarios((prev) =>
-      prev.map((u) =>
-        u.id === id ? { ...u, balance: nuevoSaldo } : u
-      )
+      prev.map((u) => (u.id === id ? { ...u, balance: nuevoSaldo } : u))
     );
 
     setMensaje("Saldo actualizado correctamente 💖");
+  };
+
+  const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
+    setMensaje("");
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: nuevoEstado })
+      .eq("id", pedidoId);
+
+    if (error) {
+      setMensaje("No se pudo actualizar el pedido.");
+      return;
+    }
+
+    setPedidos((prev) =>
+      prev.map((pedido) =>
+        pedido.id === pedidoId ? { ...pedido, status: nuevoEstado } : pedido
+      )
+    );
+
+    setMensaje("Pedido actualizado correctamente 💖");
+  };
+
+  const obtenerUsername = (userId) => {
+    const usuario = usuarios.find((u) => u.id === userId);
+    return usuario?.username || "Usuario desconocido";
   };
 
   const cerrarSesion = async () => {
@@ -144,7 +177,7 @@ export default function AdminPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí puedes ver usuarias y cambiar saldo.
+                Desde aquí puedes ver usuarias, cambiar saldo y revisar pedidos.
               </p>
             </div>
 
@@ -282,6 +315,103 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: "24px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              borderRadius: "22px",
+              padding: "20px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Pedidos</h2>
+
+            {pedidos.length === 0 ? (
+              <p style={{ color: "#8d6278" }}>Todavía no hay pedidos.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "14px" }}>
+                {pedidos.map((pedido) => (
+                  <div
+                    key={pedido.id}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #f4c5db",
+                      borderRadius: "18px",
+                      padding: "16px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                        {pedido.product_name}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                        Usuaria: {obtenerUsername(pedido.user_id)}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Precio: {pedido.price} créditos
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Estado: {pedido.status}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => cambiarEstadoPedido(pedido.id, "pendiente")}
+                        style={{
+                          border: "none",
+                          background: "#f3a1c7",
+                          color: "white",
+                          borderRadius: "12px",
+                          padding: "10px 12px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Pendiente
+                      </button>
+
+                      <button
+                        onClick={() => cambiarEstadoPedido(pedido.id, "entregado")}
+                        style={{
+                          border: "none",
+                          background: "#d96c9d",
+                          color: "white",
+                          borderRadius: "12px",
+                          padding: "10px 12px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Entregado
+                      </button>
+
+                      <button
+                        onClick={() => cambiarEstadoPedido(pedido.id, "cancelado")}
+                        style={{
+                          border: "none",
+                          background: "#c5578b",
+                          color: "white",
+                          borderRadius: "12px",
+                          padding: "10px 12px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancelado
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
