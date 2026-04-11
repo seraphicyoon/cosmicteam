@@ -14,12 +14,12 @@ export default function Home() {
     cargarTodo();
   }, []);
 
-  const cargarTodo = async () => {
+  async function cargarTodo() {
     setCargando(true);
 
     const { data: authData } = await supabase.auth.getUser();
 
-    if (authData?.user) {
+    if (authData && authData.user) {
       const { data: perfilData } = await supabase
         .from("profiles")
         .select("*")
@@ -46,14 +46,14 @@ export default function Home() {
     }
 
     setCargando(false);
-  };
+  }
 
-  const comprarProducto = async (producto) => {
+  async function comprarProducto(producto) {
     setMensaje("");
 
     const { data: authData } = await supabase.auth.getUser();
 
-    if (!authData?.user) {
+    if (!authData || !authData.user) {
       window.location.href = "/login";
       return;
     }
@@ -71,7 +71,9 @@ export default function Home() {
       }
 
       setMensaje(
-        `Compra realizada con éxito 💖 Tu pedido de ${data?.product_name || producto.name} fue registrado.`
+        "Compra realizada con éxito 💖 Tu pedido de " +
+          (data?.product_name || producto.name) +
+          " fue registrado."
       );
 
       await cargarTodo();
@@ -80,7 +82,7 @@ export default function Home() {
     } finally {
       setComprandoId(null);
     }
-  };
+  }
 
   return (
     <main
@@ -149,7 +151,7 @@ export default function Home() {
             }}
           >
             <div style={{ color: "#9f7389", fontSize: "13px" }}>
-              {perfil ? `Saldo de ${perfil.username}` : "Saldo"}
+              {perfil ? "Saldo de " + perfil.username : "Saldo"}
             </div>
             <div
               style={{
@@ -158,7 +160,7 @@ export default function Home() {
                 fontWeight: "bold",
               }}
             >
-              {perfil ? `${perfil.balance ?? 0} créditos` : "Inicia sesión"}
+              {perfil ? (perfil.balance ?? 0) + " créditos" : "Inicia sesión"}
             </div>
           </div>
         </div>
@@ -347,7 +349,7 @@ export default function Home() {
                       }}
                     >
                       {producto.stock > 0
-                        ? `Stock disponible: ${producto.stock}`
+                        ? "Stock disponible: " + producto.stock
                         : "Agotado"}
                     </p>
 
