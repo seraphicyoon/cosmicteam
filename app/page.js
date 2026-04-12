@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-function parseOptions(optionsText, basePrice) {
+function parseOptions(optionsText) {
   const text = (optionsText || "").trim();
   if (!text) return [];
 
@@ -16,12 +16,9 @@ function parseOptions(optionsText, basePrice) {
       const label = (parts[0] || "").trim();
       const price = Number((parts[1] || "").trim());
 
-      if (!label || isNaN(price)) return null;
+      if (!label || Number.isNaN(price)) return null;
 
-      return {
-        label,
-        price,
-      };
+      return { label, price };
     })
     .filter(Boolean);
 }
@@ -77,14 +74,14 @@ export default function Home() {
       const items = productosData || [];
       setProductos(items);
 
-      const nextSelected = {};
+      const initialSelections = {};
       items.forEach((p) => {
-        const opts = parseOptions(p.options_text, p.price);
-        if (opts.length > 0) {
-          nextSelected[p.id] = opts[0];
+        const options = parseOptions(p.options_text);
+        if (options.length > 0) {
+          initialSelections[p.id] = options[0];
         }
       });
-      setSelectedOptions(nextSelected);
+      setSelectedOptions(initialSelections);
     } else {
       setProductos([]);
     }
@@ -104,17 +101,24 @@ export default function Home() {
       return;
     }
 
+    const options = parseOptions(producto.options_text);
     const selectedOption = selectedOptions[producto.id] || null;
-    const finalPrice = selectedOption ? selectedOption.price : producto.price;
+
     const finalName = selectedOption
       ? `${producto.name} - ${selectedOption.label}`
       : producto.name;
+
+    const finalPrice = selectedOption
+      ? Number(selectedOption.price)
+      : Number(producto.price);
 
     try {
       setComprandoId(producto.id);
 
       const { data, error } = await supabase.rpc("buy_product", {
         p_product_id: producto.id,
+        p_final_name: finalName,
+        p_final_price: finalPrice,
       });
 
       if (error) {
@@ -122,38 +126,9 @@ export default function Home() {
         return;
       }
 
-      // si hay opción, ajustamos pedido recién creado
-      if (selectedOption && data?.order_id) {
-        await supabase
-          .from("orders")
-          .update({
-            product_name: finalName,
-            price: finalPrice,
-          })
-          .eq("id", data.order_id);
-
-        if (perfil) {
-          await supabase
-            .from("profiles")
-            .update({
-              balance: (perfil.balance ?? 0) + producto.price - finalPrice,
-            })
-            .eq("id", perfil.id);
-
-          await supabase.from("wallet_movements").insert([
-            {
-              user_id: perfil.id,
-              amount: producto.price - finalPrice,
-              type: "ajuste_opcion",
-              description: `Ajuste por opción ${selectedOption.label} en ${producto.name}`,
-            },
-          ]);
-        }
-      }
-
       setMensaje(
         "Compra realizada con éxito 💖 Tu pedido de " +
-          finalName +
+          (data?.product_name || finalName) +
           " fue registrado."
       );
 
@@ -395,7 +370,7 @@ export default function Home() {
               }}
             >
               {productos.map((producto) => {
-                const options = parseOptions(producto.options_text, producto.price);
+                const options = parseOptions(producto.options_text);
                 const selectedOption = selectedOptions[producto.id] || null;
                 const displayPrice = selectedOption
                   ? selectedOption.price
