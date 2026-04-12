@@ -45,6 +45,16 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!mensaje) return;
+
+    const timer = setTimeout(() => {
+      setMensaje("");
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [mensaje]);
+
   async function cargarTodo() {
     setCargando(true);
 
@@ -150,6 +160,54 @@ export default function Home() {
         padding: "24px",
       }}
     >
+      {mensaje ? (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            right: "20px",
+            zIndex: 9999,
+            maxWidth: "380px",
+            width: "calc(100% - 40px)",
+            background: "rgba(255,255,255,0.96)",
+            border: "1px solid #f4c5db",
+            borderRadius: "18px",
+            boxShadow: "0 12px 30px rgba(233, 145, 184, 0.22)",
+            padding: "14px 16px",
+            color: "#8a4f6e",
+            fontSize: "14px",
+            lineHeight: 1.5,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: "12px",
+            }}
+          >
+            <div style={{ flex: 1 }}>{mensaje}</div>
+
+            <button
+              onClick={() => setMensaje("")}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#c5578b",
+                fontSize: "18px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <div
           style={{
@@ -219,23 +277,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {mensaje ? (
-          <div
-            style={{
-              marginTop: "18px",
-              padding: "14px",
-              borderRadius: "16px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              color: "#8a4f6e",
-              fontSize: "14px",
-              lineHeight: 1.5,
-            }}
-          >
-            {mensaje}
-          </div>
-        ) : null}
 
         <div
           style={{
