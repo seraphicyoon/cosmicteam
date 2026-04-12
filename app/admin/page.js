@@ -119,6 +119,36 @@ const textAreaStyle = {
   boxSizing: "border-box",
 };
 
+function getAutoMessageByStatus(status) {
+  const s = (status || "").toLowerCase();
+
+  if (s.includes("pendiente")) {
+    return "Tu pedido fue recibido correctamente y está en cola de asignación.";
+  }
+
+  if (s.includes("verificando")) {
+    return "Estamos validando disponibilidad y detalles con el área correspondiente.";
+  }
+
+  if (s.includes("esperando")) {
+    return "Tu pedido está en fila con el área de activación. Será procesado en breve.";
+  }
+
+  if (s.includes("preparacion")) {
+    return "Tu pedido ya está en proceso de preparación. No es necesario realizar ninguna acción.";
+  }
+
+  if (s.includes("entrega")) {
+    return "Tu servicio ha sido enviado. Revisa el detalle del pedido para acceder a tu entrega.";
+  }
+
+  if (s.includes("cancelado")) {
+    return "El pedido fue cancelado. Si tienes dudas, puedes consultarlo desde el chat del pedido.";
+  }
+
+  return "";
+}
+
 export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
@@ -489,6 +519,29 @@ export default function AdminPage() {
         pedido.id === pedidoId ? { ...pedido, status: nuevoEstado } : pedido
       )
     );
+
+    const autoMessage = getAutoMessageByStatus(nuevoEstado);
+    if (autoMessage && perfil) {
+      const { data: msgData, error: msgError } = await supabase
+        .from("order_messages")
+        .insert([
+          {
+            order_id: pedidoId,
+            user_id: perfil.id,
+            sender_role: "admin",
+            message: autoMessage,
+          },
+        ])
+        .select()
+        .single();
+
+      if (!msgError && msgData) {
+        setMensajesPorPedido((prev) => ({
+          ...prev,
+          [pedidoId]: [...(prev[pedidoId] || []), msgData],
+        }));
+      }
+    }
 
     setMensaje("Pedido actualizado correctamente 💖");
   };
