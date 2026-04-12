@@ -97,6 +97,28 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
+function smallBtn(background) {
+  return {
+    border: "none",
+    background,
+    color: "white",
+    borderRadius: "12px",
+    padding: "10px 12px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  };
+}
+
+const textAreaStyle = {
+  width: "100%",
+  padding: "12px",
+  borderRadius: "12px",
+  border: "1px solid #f4c5db",
+  fontSize: "15px",
+  resize: "vertical",
+  boxSizing: "border-box",
+};
+
 export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
@@ -122,11 +144,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     let mounted = true;
-    let intervalId;
 
-    async function cargarTodo(showLoading = true) {
+    async function cargarTodo() {
       if (!mounted) return;
-      if (showLoading) setCargando(true);
+      setCargando(true);
 
       const { data: userData } = await supabase.auth.getUser();
 
@@ -225,18 +246,13 @@ export default function AdminPage() {
       });
       setProductosEditados(productosIniciales);
 
-      if (showLoading) setCargando(false);
+      setCargando(false);
     }
 
-    cargarTodo(true);
-
-    intervalId = setInterval(() => {
-      cargarTodo(false);
-    }, 3000);
+    cargarTodo();
 
     return () => {
       mounted = false;
-      if (intervalId) clearInterval(intervalId);
     };
   }, []);
 
@@ -288,6 +304,11 @@ export default function AdminPage() {
     setUsuarios((prev) =>
       prev.map((u) => (u.id === id ? { ...u, balance: nuevoSaldo } : u))
     );
+
+    setSaldosEditados((prev) => ({
+      ...prev,
+      [id]: nuevoSaldo,
+    }));
 
     setMensaje("Saldo actualizado correctamente 💖");
   };
@@ -1586,25 +1607,3 @@ export default function AdminPage() {
     </main>
   );
 }
-
-function smallBtn(background) {
-  return {
-    border: "none",
-    background,
-    color: "white",
-    borderRadius: "12px",
-    padding: "10px 12px",
-    fontWeight: "bold",
-    cursor: "pointer",
-  };
-}
-
-const textAreaStyle = {
-  width: "100%",
-  padding: "12px",
-  borderRadius: "12px",
-  border: "1px solid #f4c5db",
-  fontSize: "15px",
-  resize: "vertical",
-  boxSizing: "border-box",
-};
