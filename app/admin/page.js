@@ -431,6 +431,28 @@ export default function AdminPage() {
     setMensaje("Pedido actualizado correctamente 💖");
   };
 
+  const cambiarEstadoChat = async (pedidoId, cerrado) => {
+    setMensaje("");
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ chat_closed: cerrado })
+      .eq("id", pedidoId);
+
+    if (error) {
+      setMensaje("No se pudo cambiar el estado del chat.");
+      return;
+    }
+
+    setPedidos((prev) =>
+      prev.map((pedido) =>
+        pedido.id === pedidoId ? { ...pedido, chat_closed: cerrado } : pedido
+      )
+    );
+
+    setMensaje(cerrado ? "Chat cerrado correctamente 💖" : "Chat reabierto correctamente 💖");
+  };
+
   const guardarDetallePedido = async (pedidoId) => {
     setMensaje("");
 
@@ -465,6 +487,12 @@ export default function AdminPage() {
   const enviarMensaje = async (orderId) => {
     const texto = (nuevoMensaje[orderId] || "").trim();
     if (!texto || !perfil) return;
+
+    const pedido = pedidos.find((p) => p.id === orderId);
+    if (pedido?.chat_closed) {
+      setMensaje("Este chat está cerrado.");
+      return;
+    }
 
     const { data, error } = await supabase
       .from("order_messages")
@@ -1020,6 +1048,56 @@ export default function AdminPage() {
                         </button>
                       </div>
 
+                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
+                        {!pedido.chat_closed ? (
+                          <button
+                            onClick={() => cambiarEstadoChat(pedido.id, true)}
+                            style={{
+                              border: "none",
+                              background: "#94456b",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Cerrar chat
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => cambiarEstadoChat(pedido.id, false)}
+                            style={{
+                              border: "none",
+                              background: "#4c9a69",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Reabrir chat
+                          </button>
+                        )}
+
+                        <div
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: "12px",
+                            background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
+                            color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
+                            border: pedido.chat_closed
+                              ? "1px solid #efc6c6"
+                              : "1px solid #c9ebd3",
+                            fontWeight: "bold",
+                            fontSize: "14px",
+                          }}
+                        >
+                          {pedido.chat_closed ? "Chat cerrado" : "Chat abierto"}
+                        </div>
+                      </div>
+
                       <div
                         style={{
                           marginTop: "16px",
@@ -1153,7 +1231,11 @@ export default function AdminPage() {
                         <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
                           <textarea
                             rows={3}
-                            placeholder="Escribe un mensaje para esta orden..."
+                            placeholder={
+                              pedido.chat_closed
+                                ? "Este chat está cerrado."
+                                : "Escribe un mensaje para esta orden..."
+                            }
                             value={nuevoMensaje[pedido.id] || ""}
                             onChange={(e) =>
                               setNuevoMensaje((prev) => ({
@@ -1161,6 +1243,7 @@ export default function AdminPage() {
                                 [pedido.id]: e.target.value,
                               }))
                             }
+                            disabled={pedido.chat_closed}
                             style={{
                               width: "100%",
                               padding: "12px",
@@ -1169,19 +1252,21 @@ export default function AdminPage() {
                               fontSize: "15px",
                               resize: "vertical",
                               boxSizing: "border-box",
+                              background: pedido.chat_closed ? "#f7f2f5" : "white",
                             }}
                           />
 
                           <button
                             onClick={() => enviarMensaje(pedido.id)}
+                            disabled={pedido.chat_closed}
                             style={{
                               border: "none",
-                              background: "#e98ab3",
+                              background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
                               color: "white",
                               borderRadius: "12px",
                               padding: "10px 14px",
                               fontWeight: "bold",
-                              cursor: "pointer",
+                              cursor: pedido.chat_closed ? "not-allowed" : "pointer",
                               width: "fit-content",
                             }}
                           >
