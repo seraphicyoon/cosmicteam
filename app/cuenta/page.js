@@ -83,6 +83,8 @@ export default function CuentaPage() {
   const [cargando, setCargando] = useState(true);
   const [expandedOrders, setExpandedOrders] = useState({});
   const [showRechargeInfo, setShowRechargeInfo] = useState(false);
+  const [reopenForms, setReopenForms] = useState({});
+  const [aviso, setAviso] = useState("");
 
   async function cargarMensajes(orderIds) {
     if (!orderIds || orderIds.length === 0) {
@@ -220,6 +222,64 @@ export default function CuentaPage() {
     }));
   }
 
+  async function solicitarReapertura(orderId) {
+    const motivo = (reopenForms[orderId] || "").trim();
+    if (!motivo) {
+      setAviso("Escribe el motivo de la reposición.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        reopen_requested: true,
+        reopen_reason: motivo,
+      })
+      .eq("id", orderId);
+
+    if (error) {
+      setAviso("No se pudo enviar la solicitud.");
+      return;
+    }
+
+    const { data: msgData } = await supabase
+      .from("order_messages")
+      .insert([
+        {
+          order_id: orderId,
+          user_id: perfil.id,
+          sender_role: "user",
+          message:
+            "Solicité reapertura del chat por reposición/garantía.\nMotivo: " +
+            motivo,
+        },
+      ])
+      .select()
+      .single();
+
+    if (msgData) {
+      setMensajesPorPedido((prev) => ({
+        ...prev,
+        [orderId]: [...(prev[orderId] || []), msgData],
+      }));
+    }
+
+    setPedidos((prev) =>
+      prev.map((p) =>
+        p.id === orderId
+          ? { ...p, reopen_requested: true, reopen_reason: motivo }
+          : p
+      )
+    );
+
+    setReopenForms((prev) => ({
+      ...prev,
+      [orderId]: "",
+    }));
+
+    setAviso("Solicitud enviada correctamente 💖");
+  }
+
   if (cargando) {
     return (
       <main
@@ -332,6 +392,21 @@ export default function CuentaPage() {
             </div>
           </div>
 
+          {aviso ? (
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "12px",
+                borderRadius: "14px",
+                border: "1px solid #f4c5db",
+                background: "#fff7fb",
+                color: "#8d6278",
+              }}
+            >
+              {aviso}
+            </div>
+          ) : null}
+
           <div
             style={{
               marginTop: "24px",
@@ -351,13 +426,7 @@ export default function CuentaPage() {
               <p style={{ margin: 0, color: "#9f6c84", fontSize: "14px" }}>
                 Usuario
               </p>
-              <h3
-                style={{
-                  margin: "10px 0 0 0",
-                  color: "#c5578b",
-                  fontSize: "26px",
-                }}
-              >
+              <h3 style={{ margin: "10px 0 0 0", color: "#c5578b", fontSize: "26px" }}>
                 {username}
               </h3>
             </div>
@@ -373,13 +442,7 @@ export default function CuentaPage() {
               <p style={{ margin: 0, color: "#9f6c84", fontSize: "14px" }}>
                 Saldo disponible
               </p>
-              <h3
-                style={{
-                  margin: "10px 0 0 0",
-                  color: "#c5578b",
-                  fontSize: "26px",
-                }}
-              >
+              <h3 style={{ margin: "10px 0 0 0", color: "#c5578b", fontSize: "26px" }}>
                 {perfil?.balance ?? 0} créditos
               </h3>
             </div>
@@ -567,9 +630,7 @@ export default function CuentaPage() {
                               marginTop: "8px",
                               padding: "8px 12px",
                               borderRadius: "12px",
-                              background: pedido.chat_closed
-                                ? "#fff1f1"
-                                : "#eefcf3",
+                              background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
                               color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
                               border: pedido.chat_closed
                                 ? "1px solid #efc6c6"
@@ -615,6 +676,80 @@ export default function CuentaPage() {
                               <strong style={{ color: "#c5578b" }}>Comentario:</strong>
                               <br />
                               {pedido.admin_comment}
+                            </div>
+                          ) : null}
+
+                          {pedido.chat_closed ? (
+                            <div
+                              style={{
+                                marginTop: "12px",
+                                padding: "14px",
+                                borderRadius: "14px",
+                                background: "#fff7fb",
+                                border: "1px solid #f4c5db",
+                              }}
+                            >
+                              <div style={{ color: "#c5578b", fontWeight: "bold" }}>
+                                Solicitar abrir chat por reposición
+                              </div>
+
+                              <div style={{ color: "#8d6278", marginTop: "8px" }}>
+                                Si tu servicio tuvo una caída dentro del tiempo de garantía
+                                indicado en tu pedido, puedes solicitar reapertura para
+                                revisión.
+                              </div>
+
+                              {pedido.reopen_requested ? (
+                                <div
+                                  style={{
+                                    marginTop: "10px",
+                                    color: "#8d6278",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  Ya enviaste una solicitud de reapertura.
+                                </div>
+                              ) : (
+                                <>
+                                  <textarea
+                                    rows={3}
+                                    placeholder="Explica brevemente la caída o el problema del servicio..."
+                                    value={reopenForms[pedido.id] || ""}
+                                    onChange={(e) =>
+                                      setReopenForms((prev) => ({
+                                        ...prev,
+                                        [pedido.id]: e.target.value,
+                                      }))
+                                    }
+                                    style={{
+                                      width: "100%",
+                                      marginTop: "10px",
+                                      padding: "12px",
+                                      borderRadius: "12px",
+                                      border: "1px solid #f4c5db",
+                                      fontSize: "15px",
+                                      resize: "vertical",
+                                      boxSizing: "border-box",
+                                    }}
+                                  />
+
+                                  <button
+                                    onClick={() => solicitarReapertura(pedido.id)}
+                                    style={{
+                                      marginTop: "10px",
+                                      border: "none",
+                                      background: "#e98ab3",
+                                      color: "white",
+                                      borderRadius: "12px",
+                                      padding: "10px 14px",
+                                      fontWeight: "bold",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Solicitar abrir chat por reposición
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ) : null}
 
@@ -667,12 +802,7 @@ export default function CuentaPage() {
                                       {msg.sender_role === "admin" ? "Admin" : "Tú"} ·{" "}
                                       {formatDate(msg.created_at)}
                                     </div>
-                                    <div
-                                      style={{
-                                        color: "#7c4a65",
-                                        whiteSpace: "pre-wrap",
-                                      }}
-                                    >
+                                    <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
                                       {msg.message}
                                     </div>
                                   </div>
@@ -680,13 +810,7 @@ export default function CuentaPage() {
                               )}
                             </div>
 
-                            <div
-                              style={{
-                                marginTop: "12px",
-                                display: "grid",
-                                gap: "10px",
-                              }}
-                            >
+                            <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
                               <textarea
                                 rows={3}
                                 placeholder={
@@ -710,9 +834,7 @@ export default function CuentaPage() {
                                   fontSize: "15px",
                                   resize: "vertical",
                                   boxSizing: "border-box",
-                                  background: pedido.chat_closed
-                                    ? "#f7f2f5"
-                                    : "white",
+                                  background: pedido.chat_closed ? "#f7f2f5" : "white",
                                 }}
                               />
 
@@ -721,16 +843,12 @@ export default function CuentaPage() {
                                 disabled={pedido.chat_closed}
                                 style={{
                                   border: "none",
-                                  background: pedido.chat_closed
-                                    ? "#d8c5cf"
-                                    : "#e98ab3",
+                                  background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
                                   color: "white",
                                   borderRadius: "12px",
                                   padding: "10px 14px",
                                   fontWeight: "bold",
-                                  cursor: pedido.chat_closed
-                                    ? "not-allowed"
-                                    : "pointer",
+                                  cursor: pedido.chat_closed ? "not-allowed" : "pointer",
                                   width: "fit-content",
                                 }}
                               >
