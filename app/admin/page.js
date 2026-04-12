@@ -261,6 +261,36 @@ export default function AdminPage() {
     setMensaje("Producto actualizado correctamente 💖");
   };
 
+  const eliminarProducto = async (productoId, nombreProducto) => {
+    const confirmado = window.confirm(
+      `¿Seguro que quieres eliminar "${nombreProducto}"?`
+    );
+
+    if (!confirmado) return;
+
+    setMensaje("");
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", productoId);
+
+    if (error) {
+      setMensaje("No se pudo eliminar el producto.");
+      return;
+    }
+
+    setProductos((prev) => prev.filter((p) => p.id !== productoId));
+
+    setProductosEditados((prev) => {
+      const copia = { ...prev };
+      delete copia[productoId];
+      return copia;
+    });
+
+    setMensaje("Producto eliminado correctamente 💖");
+  };
+
   const cambiarEstadoPedido = async (pedidoId, nuevoEstado) => {
     setMensaje("");
 
@@ -1043,6 +1073,23 @@ export default function AdminPage() {
                         }}
                       >
                         Guardar producto
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          eliminarProducto(producto.id, producto.name)
+                        }
+                        style={{
+                          border: "none",
+                          background: "#94456b",
+                          color: "white",
+                          borderRadius: "12px",
+                          padding: "10px 14px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Eliminar producto
                       </button>
                     </div>
                   </div>
