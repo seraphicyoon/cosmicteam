@@ -80,6 +80,8 @@ export default function AdminPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [mensajesPorPedido, setMensajesPorPedido] = useState({});
+  const [nuevoMensaje, setNuevoMensaje] = useState({});
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [saldosEditados, setSaldosEditados] = useState({});
@@ -151,6 +153,26 @@ export default function AdminPage() {
         };
       });
       setPedidosEditados(pedidosIniciales);
+
+      const pedidoIds = pedidosFinal.map((p) => p.id);
+      let mensajesMap = {};
+
+      if (pedidoIds.length > 0) {
+        const { data: mensajesData } = await supabase
+          .from("order_messages")
+          .select("*")
+          .in("order_id", pedidoIds)
+          .order("created_at", { ascending: true });
+
+        (mensajesData || []).forEach((msg) => {
+          if (!mensajesMap[msg.order_id]) {
+            mensajesMap[msg.order_id] = [];
+          }
+          mensajesMap[msg.order_id].push(msg);
+        });
+      }
+
+      setMensajesPorPedido(mensajesMap);
 
       const { data: listaProductos } = await supabase
         .from("products")
@@ -423,6 +445,41 @@ export default function AdminPage() {
     );
 
     setMensaje("Información del pedido guardada correctamente 💖");
+  };
+
+  const enviarMensaje = async (orderId) => {
+    const texto = (nuevoMensaje[orderId] || "").trim();
+    if (!texto || !perfil) return;
+
+    const { data, error } = await supabase
+      .from("order_messages")
+      .insert([
+        {
+          order_id: orderId,
+          user_id: perfil.id,
+          sender_role: "admin",
+          message: texto,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      setMensaje("No se pudo enviar el mensaje.");
+      return;
+    }
+
+    setMensajesPorPedido((prev) => ({
+      ...prev,
+      [orderId]: [...(prev[orderId] || []), data],
+    }));
+
+    setNuevoMensaje((prev) => ({
+      ...prev,
+      [orderId]: "",
+    }));
+
+    setMensaje("Mensaje enviado correctamente 💖");
   };
 
   const obtenerUsername = (userId) => {
@@ -800,6 +857,7 @@ export default function AdminPage() {
               <div style={{ display: "grid", gap: "14px" }}>
                 {pedidos.map((pedido) => {
                   const statusStyle = getStatusStyle(pedido.status);
+                  const mensajes = mensajesPorPedido[pedido.id] || [];
 
                   return (
                     <div
@@ -1016,6 +1074,103 @@ export default function AdminPage() {
                             }}
                           >
                             Guardar info del pedido
+                          </button>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: "14px",
+                          background: "#fffafc",
+                          border: "1px solid #f4c5db",
+                          borderRadius: "16px",
+                          padding: "14px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontWeight: "bold",
+                            color: "#c5578b",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          Chat del pedido
+                        </div>
+
+                        <div style={{ display: "grid", gap: "10px" }}>
+                          {mensajes.length === 0 ? (
+                            <div style={{ color: "#8d6278", fontSize: "14px" }}>
+                              Todavía no hay mensajes en este pedido.
+                            </div>
+                          ) : (
+                            mensajes.map((msg) => (
+                              <div
+                                key={msg.id}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: "12px",
+                                  background:
+                                    msg.sender_role === "admin" ? "#fff1f7" : "#f9f7ff",
+                                  border: "1px solid #f1d5e3",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    color: "#b36088",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  {msg.sender_role === "admin"
+                                    ? "Admin"
+                                    : obtenerUsername(msg.user_id)}{" "}
+                                  · {formatDate(msg.created_at)}
+                                </div>
+                                <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
+                                  {msg.message}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
+                          <textarea
+                            rows={3}
+                            placeholder="Escribe un mensaje para esta orden..."
+                            value={nuevoMensaje[pedido.id] || ""}
+                            onChange={(e) =>
+                              setNuevoMensaje((prev) => ({
+                                ...prev,
+                                [pedido.id]: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                              resize: "vertical",
+                              boxSizing: "border-box",
+                            }}
+                          />
+
+                          <button
+                            onClick={() => enviarMensaje(pedido.id)}
+                            style={{
+                              border: "none",
+                              background: "#e98ab3",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                              width: "fit-content",
+                            }}
+                          >
+                            Enviar mensaje
                           </button>
                         </div>
                       </div>

@@ -126,12 +126,11 @@ export default function Home() {
         return;
       }
 
-      setMensaje(
-        "Compra realizada con éxito 💖 Tu pedido de " +
-          (data?.product_name || finalName) +
-          " fue registrado."
-      );
-
+setMensaje(
+  "Compra realizada con éxito 💖 Tu pedido de " +
+    (data?.product_name || finalName) +
+    " fue registrado. Revisa tu cuenta para ver el estado, la entrega y el chat del pedido."
+);
       await cargarTodo();
     } catch (e) {
       setMensaje("Ocurrió un error inesperado al comprar.");

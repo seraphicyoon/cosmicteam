@@ -78,6 +78,8 @@ function formatDate(dateString) {
 export default function CuentaPage() {
   const [perfil, setPerfil] = useState(null);
   const [pedidos, setPedidos] = useState([]);
+  const [mensajesPorPedido, setMensajesPorPedido] = useState({});
+  const [nuevoMensaje, setNuevoMensaje] = useState({});
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -117,10 +119,31 @@ export default function CuentaPage() {
           .eq("user_id", session.user.id)
           .order("created_at", { ascending: false });
 
+        const pedidosFinal = pedidosData || [];
+
+        const ids = pedidosFinal.map((p) => p.id);
+        let mensajesMap = {};
+
+        if (ids.length > 0) {
+          const { data: mensajesData } = await supabase
+            .from("order_messages")
+            .select("*")
+            .in("order_id", ids)
+            .order("created_at", { ascending: true });
+
+          (mensajesData || []).forEach((msg) => {
+            if (!mensajesMap[msg.order_id]) {
+              mensajesMap[msg.order_id] = [];
+            }
+            mensajesMap[msg.order_id].push(msg);
+          });
+        }
+
         if (!activo) return;
 
         setPerfil(perfilData);
-        setPedidos(pedidosData || []);
+        setPedidos(pedidosFinal);
+        setMensajesPorPedido(mensajesMap);
         setCargando(false);
       } catch (e) {
         if (activo) {
@@ -140,6 +163,36 @@ export default function CuentaPage() {
   async function cerrarSesion() {
     await supabase.auth.signOut();
     window.location.href = "/login";
+  }
+
+  async function enviarMensaje(orderId) {
+    const texto = (nuevoMensaje[orderId] || "").trim();
+    if (!texto || !perfil) return;
+
+    const { data, error } = await supabase
+      .from("order_messages")
+      .insert([
+        {
+          order_id: orderId,
+          user_id: perfil.id,
+          sender_role: perfil.role === "admin" ? "admin" : "user",
+          message: texto,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) return;
+
+    setMensajesPorPedido((prev) => ({
+      ...prev,
+      [orderId]: [...(prev[orderId] || []), data],
+    }));
+
+    setNuevoMensaje((prev) => ({
+      ...prev,
+      [orderId]: "",
+    }));
   }
 
   if (cargando) {
@@ -352,39 +405,6 @@ export default function CuentaPage() {
               <br />
               6. Un administrador revisará tu pago y añadirá el saldo a tu cuenta.
             </div>
-
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "16px" }}>
-              <a
-                href="https://chat.whatsapp.com/AQUI_TU_LINK_DEL_GRUPO"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  textDecoration: "none",
-                  background: "#e98ab3",
-                  color: "white",
-                  padding: "12px 16px",
-                  borderRadius: "14px",
-                  fontWeight: "bold",
-                }}
-              >
-                Unirme al grupo de WhatsApp
-              </a>
-
-              <a
-                href="/"
-                style={{
-                  textDecoration: "none",
-                  background: "#fff",
-                  color: "#9a6b82",
-                  padding: "12px 16px",
-                  borderRadius: "14px",
-                  fontWeight: "bold",
-                  border: "1px solid #f4c5db",
-                }}
-              >
-                Ir a la tienda
-              </a>
-            </div>
           </div>
 
           <div
@@ -404,6 +424,7 @@ export default function CuentaPage() {
               <div style={{ display: "grid", gap: "12px" }}>
                 {pedidos.map((pedido) => {
                   const statusStyle = getStatusStyle(pedido.status);
+                  const mensajes = mensajesPorPedido[pedido.id] || [];
 
                   return (
                     <div
@@ -484,6 +505,101 @@ export default function CuentaPage() {
                           {pedido.admin_comment}
                         </div>
                       ) : null}
+
+                      <div
+                        style={{
+                          marginTop: "14px",
+                          background: "#fffafc",
+                          border: "1px solid #f4c5db",
+                          borderRadius: "16px",
+                          padding: "14px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontWeight: "bold",
+                            color: "#c5578b",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          Chat del pedido
+                        </div>
+
+                        <div style={{ display: "grid", gap: "10px" }}>
+                          {mensajes.length === 0 ? (
+                            <div style={{ color: "#8d6278", fontSize: "14px" }}>
+                              Todavía no hay mensajes en este pedido.
+                            </div>
+                          ) : (
+                            mensajes.map((msg) => (
+                              <div
+                                key={msg.id}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: "12px",
+                                  background:
+                                    msg.sender_role === "admin" ? "#fff1f7" : "#f9f7ff",
+                                  border: "1px solid #f1d5e3",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    color: "#b36088",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  {msg.sender_role === "admin" ? "Admin" : "Tú"} ·{" "}
+                                  {formatDate(msg.created_at)}
+                                </div>
+                                <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
+                                  {msg.message}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
+                          <textarea
+                            rows={3}
+                            placeholder="Escribe un mensaje sobre este pedido..."
+                            value={nuevoMensaje[pedido.id] || ""}
+                            onChange={(e) =>
+                              setNuevoMensaje((prev) => ({
+                                ...prev,
+                                [pedido.id]: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                              resize: "vertical",
+                              boxSizing: "border-box",
+                            }}
+                          />
+
+                          <button
+                            onClick={() => enviarMensaje(pedido.id)}
+                            style={{
+                              border: "none",
+                              background: "#e98ab3",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                              width: "fit-content",
+                            }}
+                          >
+                            Enviar mensaje
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
