@@ -3,6 +3,78 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
+function getStatusStyle(status) {
+  const s = (status || "").toLowerCase();
+
+  if (s.includes("pendiente")) {
+    return {
+      background: "#fff2f8",
+      color: "#cc6f9b",
+      border: "1px solid #f4c5db",
+    };
+  }
+
+  if (s.includes("verificando")) {
+    return {
+      background: "#fff7ec",
+      color: "#c98a3d",
+      border: "1px solid #f1d3a6",
+    };
+  }
+
+  if (s.includes("esperando")) {
+    return {
+      background: "#f8f4ff",
+      color: "#8f6ccf",
+      border: "1px solid #d8caf7",
+    };
+  }
+
+  if (s.includes("preparacion")) {
+    return {
+      background: "#eef7ff",
+      color: "#4f88c7",
+      border: "1px solid #c9def7",
+    };
+  }
+
+  if (s.includes("entrega")) {
+    return {
+      background: "#eefcf3",
+      color: "#4c9a69",
+      border: "1px solid #c9ebd3",
+    };
+  }
+
+  if (s.includes("cancelado")) {
+    return {
+      background: "#fff1f1",
+      color: "#c56b6b",
+      border: "1px solid #efc6c6",
+    };
+  }
+
+  return {
+    background: "#fff7fb",
+    color: "#8d6278",
+    border: "1px solid #f4c5db",
+  };
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "Sin fecha";
+
+  const date = new Date(dateString);
+
+  return date.toLocaleString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function CuentaPage() {
   const [perfil, setPerfil] = useState(null);
   const [pedidos, setPedidos] = useState([]);
@@ -330,65 +402,91 @@ export default function CuentaPage() {
               <p style={{ color: "#8d6278" }}>Todavía no tienes pedidos.</p>
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
-                {pedidos.map((pedido) => (
-                  <div
-                    key={pedido.id}
-                    style={{
-                      background: "#fff",
-                      border: "1px solid #f4c5db",
-                      borderRadius: "18px",
-                      padding: "16px",
-                    }}
-                  >
-                    <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                      {pedido.product_name}
-                    </div>
+                {pedidos.map((pedido) => {
+                  const statusStyle = getStatusStyle(pedido.status);
 
-                    <div style={{ color: "#8d6278", marginTop: "8px" }}>
-                      Precio: {pedido.price} créditos
-                    </div>
-
-                    <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                      Estado: {pedido.status}
-                    </div>
-
-                    {pedido.delivery_message ? (
+                  return (
+                    <div
+                      key={pedido.id}
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #f4c5db",
+                        borderRadius: "18px",
+                        padding: "16px",
+                      }}
+                    >
                       <div
                         style={{
-                          marginTop: "12px",
-                          padding: "12px",
-                          borderRadius: "12px",
-                          background: "#fff7fb",
-                          border: "1px solid #f4c5db",
-                          color: "#8d6278",
-                          whiteSpace: "pre-wrap",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                          alignItems: "center",
                         }}
                       >
-                        <strong style={{ color: "#c5578b" }}>Entrega:</strong>
-                        <br />
-                        {pedido.delivery_message}
-                      </div>
-                    ) : null}
+                        <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                          {pedido.product_name}
+                        </div>
 
-                    {pedido.admin_comment ? (
-                      <div
-                        style={{
-                          marginTop: "12px",
-                          padding: "12px",
-                          borderRadius: "12px",
-                          background: "#fff7fb",
-                          border: "1px solid #f4c5db",
-                          color: "#8d6278",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
-                        <strong style={{ color: "#c5578b" }}>Comentario:</strong>
-                        <br />
-                        {pedido.admin_comment}
+                        <div
+                          style={{
+                            ...statusStyle,
+                            borderRadius: "999px",
+                            padding: "8px 12px",
+                            fontWeight: "bold",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {pedido.status}
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
-                ))}
+
+                      <div style={{ color: "#8d6278", marginTop: "8px" }}>
+                        Precio: {pedido.price} créditos
+                      </div>
+
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Fecha: {formatDate(pedido.created_at)}
+                      </div>
+
+                      {pedido.delivery_message ? (
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            background: "#fff7fb",
+                            border: "1px solid #f4c5db",
+                            color: "#8d6278",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          <strong style={{ color: "#c5578b" }}>Entrega:</strong>
+                          <br />
+                          {pedido.delivery_message}
+                        </div>
+                      ) : null}
+
+                      {pedido.admin_comment ? (
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            background: "#fff7fb",
+                            border: "1px solid #f4c5db",
+                            color: "#8d6278",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          <strong style={{ color: "#c5578b" }}>Comentario:</strong>
+                          <br />
+                          {pedido.admin_comment}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

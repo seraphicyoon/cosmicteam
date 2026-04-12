@@ -3,6 +3,78 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
+function getStatusStyle(status) {
+  const s = (status || "").toLowerCase();
+
+  if (s.includes("pendiente")) {
+    return {
+      background: "#fff2f8",
+      color: "#cc6f9b",
+      border: "1px solid #f4c5db",
+    };
+  }
+
+  if (s.includes("verificando")) {
+    return {
+      background: "#fff7ec",
+      color: "#c98a3d",
+      border: "1px solid #f1d3a6",
+    };
+  }
+
+  if (s.includes("esperando")) {
+    return {
+      background: "#f8f4ff",
+      color: "#8f6ccf",
+      border: "1px solid #d8caf7",
+    };
+  }
+
+  if (s.includes("preparacion")) {
+    return {
+      background: "#eef7ff",
+      color: "#4f88c7",
+      border: "1px solid #c9def7",
+    };
+  }
+
+  if (s.includes("entrega")) {
+    return {
+      background: "#eefcf3",
+      color: "#4c9a69",
+      border: "1px solid #c9ebd3",
+    };
+  }
+
+  if (s.includes("cancelado")) {
+    return {
+      background: "#fff1f1",
+      color: "#c56b6b",
+      border: "1px solid #efc6c6",
+    };
+  }
+
+  return {
+    background: "#fff7fb",
+    color: "#8d6278",
+    border: "1px solid #f4c5db",
+  };
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "Sin fecha";
+
+  const date = new Date(dateString);
+
+  return date.toLocaleString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
@@ -726,41 +798,57 @@ export default function AdminPage() {
               <p style={{ color: "#8d6278" }}>Todavía no hay pedidos.</p>
             ) : (
               <div style={{ display: "grid", gap: "14px" }}>
-                {pedidos.map((pedido) => (
-                  <div
-                    key={pedido.id}
-                    style={{
-                      background: "#fff",
-                      border: "1px solid #f4c5db",
-                      borderRadius: "18px",
-                      padding: "16px",
-                    }}
-                  >
+                {pedidos.map((pedido) => {
+                  const statusStyle = getStatusStyle(pedido.status);
+
+                  return (
                     <div
+                      key={pedido.id}
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "16px",
-                        flexWrap: "wrap",
+                        background: "#fff",
+                        border: "1px solid #f4c5db",
+                        borderRadius: "18px",
+                        padding: "16px",
                       }}
                     >
-                      <div>
-                        <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                          {pedido.product_name}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: "16px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                            {pedido.product_name}
+                          </div>
+                          <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                            Usuaria: {obtenerUsername(pedido.user_id)}
+                          </div>
+                          <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                            Precio: {pedido.price} créditos
+                          </div>
+                          <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                            Fecha: {formatDate(pedido.created_at)}
+                          </div>
                         </div>
-                        <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                          Usuaria: {obtenerUsername(pedido.user_id)}
-                        </div>
-                        <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                          Precio: {pedido.price} créditos
-                        </div>
-                        <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                          Estado: {pedido.status}
+
+                        <div
+                          style={{
+                            ...statusStyle,
+                            borderRadius: "999px",
+                            padding: "8px 12px",
+                            fontWeight: "bold",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {pedido.status}
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "14px" }}>
                         <button
                           onClick={() => cambiarEstadoPedido(pedido.id, "Pendiente")}
                           style={{
@@ -858,82 +946,82 @@ export default function AdminPage() {
                           Cancelado
                         </button>
                       </div>
-                    </div>
 
-                    <div
-                      style={{
-                        marginTop: "16px",
-                        display: "grid",
-                        gap: "12px",
-                      }}
-                    >
-                      <textarea
-                        placeholder="Mensaje de entrega opcional: cuenta, contraseña, instrucciones, etc."
-                        value={pedidosEditados[pedido.id]?.delivery_message ?? ""}
-                        onChange={(e) =>
-                          setPedidosEditados((prev) => ({
-                            ...prev,
-                            [pedido.id]: {
-                              ...prev[pedido.id],
-                              delivery_message: e.target.value,
-                            },
-                          }))
-                        }
-                        rows={4}
+                      <div
                         style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                          resize: "vertical",
-                          boxSizing: "border-box",
+                          marginTop: "16px",
+                          display: "grid",
+                          gap: "12px",
                         }}
-                      />
-
-                      <textarea
-                        placeholder="Comentario opcional para la clienta"
-                        value={pedidosEditados[pedido.id]?.admin_comment ?? ""}
-                        onChange={(e) =>
-                          setPedidosEditados((prev) => ({
-                            ...prev,
-                            [pedido.id]: {
-                              ...prev[pedido.id],
-                              admin_comment: e.target.value,
-                            },
-                          }))
-                        }
-                        rows={3}
-                        style={{
-                          width: "100%",
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                          resize: "vertical",
-                          boxSizing: "border-box",
-                        }}
-                      />
-
-                      <div>
-                        <button
-                          onClick={() => guardarDetallePedido(pedido.id)}
+                      >
+                        <textarea
+                          placeholder="Mensaje de entrega opcional: cuenta, contraseña, instrucciones, etc."
+                          value={pedidosEditados[pedido.id]?.delivery_message ?? ""}
+                          onChange={(e) =>
+                            setPedidosEditados((prev) => ({
+                              ...prev,
+                              [pedido.id]: {
+                                ...prev[pedido.id],
+                                delivery_message: e.target.value,
+                              },
+                            }))
+                          }
+                          rows={4}
                           style={{
-                            border: "none",
-                            background: "#e98ab3",
-                            color: "white",
+                            width: "100%",
+                            padding: "12px",
                             borderRadius: "12px",
-                            padding: "10px 14px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
+                            border: "1px solid #f4c5db",
+                            fontSize: "15px",
+                            resize: "vertical",
+                            boxSizing: "border-box",
                           }}
-                        >
-                          Guardar info del pedido
-                        </button>
+                        />
+
+                        <textarea
+                          placeholder="Comentario opcional para la clienta"
+                          value={pedidosEditados[pedido.id]?.admin_comment ?? ""}
+                          onChange={(e) =>
+                            setPedidosEditados((prev) => ({
+                              ...prev,
+                              [pedido.id]: {
+                                ...prev[pedido.id],
+                                admin_comment: e.target.value,
+                              },
+                            }))
+                          }
+                          rows={3}
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px solid #f4c5db",
+                            fontSize: "15px",
+                            resize: "vertical",
+                            boxSizing: "border-box",
+                          }}
+                        />
+
+                        <div>
+                          <button
+                            onClick={() => guardarDetallePedido(pedido.id)}
+                            style={{
+                              border: "none",
+                              background: "#e98ab3",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Guardar info del pedido
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
