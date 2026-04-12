@@ -182,6 +182,9 @@ export default function CuentaPage() {
     const texto = (nuevoMensaje[orderId] || "").trim();
     if (!texto || !perfil) return;
 
+    const pedido = pedidos.find((p) => p.id === orderId);
+    if (pedido?.chat_closed) return;
+
     const { data, error } = await supabase
       .from("order_messages")
       .insert([
@@ -387,50 +390,6 @@ export default function CuentaPage() {
               padding: "20px",
             }}
           >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Recargar saldo</h2>
-
-            <p style={{ color: "#8d6278", lineHeight: 1.7 }}>
-              Para recargar tu saldo, únete al grupo de WhatsApp y solicita los datos
-              bancarios para hacer tu transferencia.
-            </p>
-
-            <div
-              style={{
-                background: "#fffdff",
-                border: "1px solid #f4c5db",
-                borderRadius: "18px",
-                padding: "16px",
-                color: "#8d6278",
-                lineHeight: 1.8,
-              }}
-            >
-              <strong style={{ color: "#c5578b" }}>Instrucciones:</strong>
-              <br />
-              1. Únete al grupo de WhatsApp.
-              <br />
-              2. Pide los datos bancarios de transferencia.
-              <br />
-              3. Realiza tu pago.
-              <br />
-              4. Envía en el grupo tu comprobante de pago.
-              <br />
-              5. Escribe también tu nombre de usuario:
-              <br />
-              <strong style={{ color: "#c5578b" }}>{username}</strong>
-              <br />
-              6. Un administrador revisará tu pago y añadirá el saldo a tu cuenta.
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
             <h2 style={{ marginTop: 0, color: "#c5578b" }}>Mis pedidos</h2>
 
             {pedidos.length === 0 ? (
@@ -485,41 +444,23 @@ export default function CuentaPage() {
                         Fecha: {formatDate(pedido.created_at)}
                       </div>
 
-                      {pedido.delivery_message ? (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            background: "#fff7fb",
-                            border: "1px solid #f4c5db",
-                            color: "#8d6278",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          <strong style={{ color: "#c5578b" }}>Entrega:</strong>
-                          <br />
-                          {pedido.delivery_message}
-                        </div>
-                      ) : null}
-
-                      {pedido.admin_comment ? (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            background: "#fff7fb",
-                            border: "1px solid #f4c5db",
-                            color: "#8d6278",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          <strong style={{ color: "#c5578b" }}>Comentario:</strong>
-                          <br />
-                          {pedido.admin_comment}
-                        </div>
-                      ) : null}
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          padding: "8px 12px",
+                          borderRadius: "12px",
+                          background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
+                          color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
+                          border: pedido.chat_closed
+                            ? "1px solid #efc6c6"
+                            : "1px solid #c9ebd3",
+                          fontWeight: "bold",
+                          fontSize: "14px",
+                          display: "inline-block",
+                        }}
+                      >
+                        {pedido.chat_closed ? "Chat cerrado por admin" : "Chat abierto"}
+                      </div>
 
                       <div
                         style={{
@@ -579,7 +520,11 @@ export default function CuentaPage() {
                         <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
                           <textarea
                             rows={3}
-                            placeholder="Escribe un mensaje sobre este pedido..."
+                            placeholder={
+                              pedido.chat_closed
+                                ? "Este chat fue cerrado por admin."
+                                : "Escribe un mensaje sobre este pedido..."
+                            }
                             value={nuevoMensaje[pedido.id] || ""}
                             onChange={(e) =>
                               setNuevoMensaje((prev) => ({
@@ -587,6 +532,7 @@ export default function CuentaPage() {
                                 [pedido.id]: e.target.value,
                               }))
                             }
+                            disabled={pedido.chat_closed}
                             style={{
                               width: "100%",
                               padding: "12px",
@@ -595,19 +541,21 @@ export default function CuentaPage() {
                               fontSize: "15px",
                               resize: "vertical",
                               boxSizing: "border-box",
+                              background: pedido.chat_closed ? "#f7f2f5" : "white",
                             }}
                           />
 
                           <button
                             onClick={() => enviarMensaje(pedido.id)}
+                            disabled={pedido.chat_closed}
                             style={{
                               border: "none",
-                              background: "#e98ab3",
+                              background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
                               color: "white",
                               borderRadius: "12px",
                               padding: "10px 14px",
                               fontWeight: "bold",
-                              cursor: "pointer",
+                              cursor: pedido.chat_closed ? "not-allowed" : "pointer",
                               width: "fit-content",
                             }}
                           >
