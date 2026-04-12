@@ -97,7 +97,13 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    const cargarTodo = async () => {
+    let mounted = true;
+    let intervalId;
+
+    async function cargarTodo(showLoading = true) {
+      if (!mounted) return;
+      if (showLoading) setCargando(true);
+
       const { data: userData } = await supabase.auth.getUser();
 
       if (!userData?.user) {
@@ -155,7 +161,7 @@ export default function AdminPage() {
       setPedidosEditados(pedidosIniciales);
 
       const pedidoIds = pedidosFinal.map((p) => p.id);
-      let mensajesMap = {};
+      const mensajesMap = {};
 
       if (pedidoIds.length > 0) {
         const { data: mensajesData } = await supabase
@@ -195,10 +201,19 @@ export default function AdminPage() {
       });
       setProductosEditados(productosIniciales);
 
-      setCargando(false);
-    };
+      if (showLoading) setCargando(false);
+    }
 
-    cargarTodo();
+    cargarTodo(true);
+
+    intervalId = setInterval(() => {
+      cargarTodo(false);
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   const guardarSaldo = async (id) => {

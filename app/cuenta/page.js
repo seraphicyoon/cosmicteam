@@ -82,81 +82,94 @@ export default function CuentaPage() {
   const [nuevoMensaje, setNuevoMensaje] = useState({});
   const [cargando, setCargando] = useState(true);
 
-  useEffect(() => {
-    let activo = true;
-
-    async function cargarCuenta() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.user) {
-          if (activo) {
-            setCargando(false);
-            window.location.href = "/login";
-          }
-          return;
-        }
-
-        const { data: perfilData, error: perfilError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-
-        if (perfilError || !perfilData) {
-          if (activo) {
-            setCargando(false);
-            window.location.href = "/login";
-          }
-          return;
-        }
-
-        const { data: pedidosData } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
-
-        const pedidosFinal = pedidosData || [];
-
-        const ids = pedidosFinal.map((p) => p.id);
-        let mensajesMap = {};
-
-        if (ids.length > 0) {
-          const { data: mensajesData } = await supabase
-            .from("order_messages")
-            .select("*")
-            .in("order_id", ids)
-            .order("created_at", { ascending: true });
-
-          (mensajesData || []).forEach((msg) => {
-            if (!mensajesMap[msg.order_id]) {
-              mensajesMap[msg.order_id] = [];
-            }
-            mensajesMap[msg.order_id].push(msg);
-          });
-        }
-
-        if (!activo) return;
-
-        setPerfil(perfilData);
-        setPedidos(pedidosFinal);
-        setMensajesPorPedido(mensajesMap);
-        setCargando(false);
-      } catch (e) {
-        if (activo) {
-          setCargando(false);
-          window.location.href = "/login";
-        }
-      }
+  async function cargarMensajes(orderIds) {
+    if (!orderIds || orderIds.length === 0) {
+      setMensajesPorPedido({});
+      return;
     }
 
-    cargarCuenta();
+    const { data: mensajesData } = await supabase
+      .from("order_messages")
+      .select("*")
+      .in("order_id", orderIds)
+      .order("created_at", { ascending: true });
+
+    const mensajesMap = {};
+    (mensajesData || []).forEach((msg) => {
+      if (!mensajesMap[msg.order_id]) {
+        mensajesMap[msg.order_id] = [];
+      }
+      mensajesMap[msg.order_id].push(msg);
+    });
+
+    setMensajesPorPedido(mensajesMap);
+  }
+
+  async function cargarCuenta(showLoading = true) {
+    if (showLoading) setCargando(true);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        if (showLoading) setCargando(false);
+        window.location.href = "/login";
+        return;
+      }
+
+      const { data: perfilData, error: perfilError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+
+      if (perfilError || !perfilData) {
+        if (showLoading) setCargando(false);
+        window.location.href = "/login";
+        return;
+      }
+
+      const { data: pedidosData } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      const pedidosFinal = pedidosData || [];
+      const ids = pedidosFinal.map((p) => p.id);
+
+      setPerfil(perfilData);
+      setPedidos(pedidosFinal);
+      await cargarMensajes(ids);
+
+      if (showLoading) setCargando(false);
+    } catch (e) {
+      if (showLoading) setCargando(false);
+      window.location.href = "/login";
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    let intervalId;
+
+    async function init() {
+      if (!mounted) return;
+      await cargarCuenta(true);
+
+      intervalId = setInterval(async () => {
+        if (!mounted) return;
+        await cargarCuenta(false);
+      }, 3000);
+    }
+
+    init();
 
     return () => {
-      activo = false;
+      mounted = false;
+      if (intervalId) clearInterval(intervalId);
     };
   }, []);
 
@@ -204,7 +217,8 @@ export default function CuentaPage() {
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "Arial, sans-serif",
-          background: "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
+          background:
+            "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
         }}
       >
         Cargando tu cuenta...
@@ -218,7 +232,8 @@ export default function CuentaPage() {
     <main
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
+        background:
+          "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
         padding: "24px",
         fontFamily: "Arial, sans-serif",
         color: "#7c4a65",
