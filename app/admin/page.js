@@ -19,6 +19,7 @@ export default function AdminPage() {
     price: "",
     stock: "",
     active: true,
+    options_text: "",
   });
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function AdminPage() {
           price: p.price ?? 0,
           stock: p.stock ?? 0,
           active: !!p.active,
+          options_text: p.options_text || "",
         };
       });
       setProductosEditados(productosIniciales);
@@ -139,6 +141,7 @@ export default function AdminPage() {
     const description = nuevoProducto.description.trim();
     const price = Number(nuevoProducto.price);
     const stock = Number(nuevoProducto.stock);
+    const options_text = nuevoProducto.options_text.trim();
 
     if (!name) {
       setMensaje("Escribe el nombre del producto.");
@@ -146,7 +149,7 @@ export default function AdminPage() {
     }
 
     if (isNaN(price) || price < 0) {
-      setMensaje("El precio debe ser un número válido.");
+      setMensaje("El precio base debe ser un número válido.");
       return;
     }
 
@@ -164,6 +167,7 @@ export default function AdminPage() {
           price,
           stock,
           active: nuevoProducto.active,
+          options_text,
         },
       ])
       .select()
@@ -183,6 +187,7 @@ export default function AdminPage() {
         price: data.price ?? 0,
         stock: data.stock ?? 0,
         active: !!data.active,
+        options_text: data.options_text || "",
       },
     }));
 
@@ -192,6 +197,7 @@ export default function AdminPage() {
       price: "",
       stock: "",
       active: true,
+      options_text: "",
     });
 
     setMensaje("Producto creado correctamente 💖");
@@ -211,6 +217,7 @@ export default function AdminPage() {
     const price = Number(producto.price);
     const stock = Number(producto.stock);
     const active = !!producto.active;
+    const options_text = String(producto.options_text || "").trim();
 
     if (!name) {
       setMensaje("El producto debe tener nombre.");
@@ -235,6 +242,7 @@ export default function AdminPage() {
         price,
         stock,
         active,
+        options_text,
       })
       .eq("id", productoId);
 
@@ -253,6 +261,7 @@ export default function AdminPage() {
               price,
               stock,
               active,
+              options_text,
             }
           : p
       )
@@ -523,7 +532,7 @@ export default function AdminPage() {
               <input
                 type="number"
                 min="0"
-                placeholder="Precio"
+                placeholder="Precio base"
                 value={nuevoProducto.price}
                 onChange={(e) =>
                   setNuevoProducto((prev) => ({ ...prev, price: e.target.value }))
@@ -552,6 +561,28 @@ export default function AdminPage() {
                 }}
               />
             </div>
+
+            <textarea
+              placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
+              value={nuevoProducto.options_text}
+              onChange={(e) =>
+                setNuevoProducto((prev) => ({
+                  ...prev,
+                  options_text: e.target.value,
+                }))
+              }
+              rows={6}
+              style={{
+                width: "100%",
+                marginTop: "12px",
+                padding: "12px",
+                borderRadius: "12px",
+                border: "1px solid #f4c5db",
+                fontSize: "15px",
+                resize: "vertical",
+                boxSizing: "border-box",
+              }}
+            />
 
             <div
               style={{
@@ -994,7 +1025,7 @@ export default function AdminPage() {
                             },
                           }))
                         }
-                        placeholder="Precio"
+                        placeholder="Precio base"
                         style={{
                           padding: "12px",
                           borderRadius: "12px",
@@ -1025,6 +1056,31 @@ export default function AdminPage() {
                         }}
                       />
                     </div>
+
+                    <textarea
+                      value={productosEditados[producto.id]?.options_text ?? ""}
+                      onChange={(e) =>
+                        setProductosEditados((prev) => ({
+                          ...prev,
+                          [producto.id]: {
+                            ...prev[producto.id],
+                            options_text: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
+                      rows={6}
+                      style={{
+                        width: "100%",
+                        marginTop: "12px",
+                        padding: "12px",
+                        borderRadius: "12px",
+                        border: "1px solid #f4c5db",
+                        fontSize: "15px",
+                        resize: "vertical",
+                        boxSizing: "border-box",
+                      }}
+                    />
 
                     <div
                       style={{

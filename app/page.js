@@ -1,7 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+
+function parseOptions(optionsText, basePrice) {
+  const text = (optionsText || "").trim();
+  if (!text) return [];
+
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|");
+      const label = (parts[0] || "").trim();
+      const price = Number((parts[1] || "").trim());
+
+      if (!label || isNaN(price)) return null;
+
+      return {
+        label,
+        price,
+      };
+    })
+    .filter(Boolean);
+}
 
 export default function Home() {
   const [productos, setProductos] = useState([]);
@@ -9,6 +32,7 @@ export default function Home() {
   const [perfil, setPerfil] = useState(null);
   const [mensaje, setMensaje] = useState("");
   const [comprandoId, setComprandoId] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState({});
 
   useEffect(() => {
     cargarTodo();
@@ -50,7 +74,17 @@ export default function Home() {
       .order("created_at", { ascending: false });
 
     if (!error) {
-      setProductos(productosData || []);
+      const items = productosData || [];
+      setProductos(items);
+
+      const nextSelected = {};
+      items.forEach((p) => {
+        const opts = parseOptions(p.options_text, p.price);
+        if (opts.length > 0) {
+          nextSelected[p.id] = opts[0];
+        }
+      });
+      setSelectedOptions(nextSelected);
     } else {
       setProductos([]);
     }
@@ -70,6 +104,12 @@ export default function Home() {
       return;
     }
 
+    const selectedOption = selectedOptions[producto.id] || null;
+    const finalPrice = selectedOption ? selectedOption.price : producto.price;
+    const finalName = selectedOption
+      ? `${producto.name} - ${selectedOption.label}`
+      : producto.name;
+
     try {
       setComprandoId(producto.id);
 
@@ -82,9 +122,38 @@ export default function Home() {
         return;
       }
 
+      // si hay opción, ajustamos pedido recién creado
+      if (selectedOption && data?.order_id) {
+        await supabase
+          .from("orders")
+          .update({
+            product_name: finalName,
+            price: finalPrice,
+          })
+          .eq("id", data.order_id);
+
+        if (perfil) {
+          await supabase
+            .from("profiles")
+            .update({
+              balance: (perfil.balance ?? 0) + producto.price - finalPrice,
+            })
+            .eq("id", perfil.id);
+
+          await supabase.from("wallet_movements").insert([
+            {
+              user_id: perfil.id,
+              amount: producto.price - finalPrice,
+              type: "ajuste_opcion",
+              description: `Ajuste por opción ${selectedOption.label} en ${producto.name}`,
+            },
+          ]);
+        }
+      }
+
       setMensaje(
         "Compra realizada con éxito 💖 Tu pedido de " +
-          (data?.product_name || producto.name) +
+          finalName +
           " fue registrado."
       );
 
@@ -325,101 +394,138 @@ export default function Home() {
                 gap: "22px",
               }}
             >
-              {productos.map((producto) => (
-                <div
-                  key={producto.id}
-                  style={{
-                    background: "rgba(255,255,255,0.92)",
-                    border: "1px solid #f5bfd6",
-                    borderRadius: "26px",
-                    overflow: "hidden",
-                    boxShadow: "0 10px 24px rgba(244, 182, 210, 0.22)",
-                  }}
-                >
+              {productos.map((producto) => {
+                const options = parseOptions(producto.options_text, producto.price);
+                const selectedOption = selectedOptions[producto.id] || null;
+                const displayPrice = selectedOption
+                  ? selectedOption.price
+                  : producto.price;
+
+                return (
                   <div
+                    key={producto.id}
                     style={{
-                      height: "170px",
-                      background:
-                        "linear-gradient(135deg, #ffd9ea 0%, #fff0f7 45%, #ffe7bf 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "28px",
-                      fontWeight: "bold",
-                      color: "#c95c93",
-                      textAlign: "center",
-                      padding: "12px",
+                      background: "rgba(255,255,255,0.92)",
+                      border: "1px solid #f5bfd6",
+                      borderRadius: "26px",
+                      overflow: "hidden",
+                      boxShadow: "0 10px 24px rgba(244, 182, 210, 0.22)",
                     }}
                   >
-                    {producto.name}
-                  </div>
-
-                  <div style={{ padding: "18px" }}>
-                    <h3
+                    <div
                       style={{
-                        margin: 0,
-                        fontSize: "24px",
-                        color: "#a84d7c",
+                        height: "170px",
+                        background:
+                          "linear-gradient(135deg, #ffd9ea 0%, #fff0f7 45%, #ffe7bf 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "28px",
+                        fontWeight: "bold",
+                        color: "#c95c93",
+                        textAlign: "center",
+                        padding: "12px",
                       }}
                     >
                       {producto.name}
-                    </h3>
+                    </div>
 
-                    <p style={{ color: "#8b5d75", marginTop: "10px" }}>
-                      {producto.description || "Sin descripción"}
-                    </p>
+                    <div style={{ padding: "18px" }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: "24px",
+                          color: "#a84d7c",
+                        }}
+                      >
+                        {producto.name}
+                      </h3>
 
-                    <p
-                      style={{
-                        color: "#d55d95",
-                        fontWeight: "bold",
-                        fontSize: "28px",
-                        marginTop: "14px",
-                      }}
-                    >
-                      {producto.price} créditos
-                    </p>
+                      <p style={{ color: "#8b5d75", marginTop: "10px" }}>
+                        {producto.description || "Sin descripción"}
+                      </p>
 
-                    <p
-                      style={{
-                        color: producto.stock > 0 ? "#8b5d75" : "#c5578b",
-                        marginTop: "8px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {producto.stock > 0
-                        ? "Stock disponible: " + producto.stock
-                        : "Agotado"}
-                    </p>
+                      {options.length > 0 ? (
+                        <select
+                          value={selectedOption?.label || options[0].label}
+                          onChange={(e) => {
+                            const found = options.find(
+                              (opt) => opt.label === e.target.value
+                            );
+                            setSelectedOptions((prev) => ({
+                              ...prev,
+                              [producto.id]: found || options[0],
+                            }));
+                          }}
+                          style={{
+                            width: "100%",
+                            marginTop: "12px",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px solid #f4c5db",
+                            fontSize: "15px",
+                          }}
+                        >
+                          {options.map((opt) => (
+                            <option key={opt.label} value={opt.label}>
+                              {opt.label} - {opt.price} créditos
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
 
-                    <button
-                      onClick={() => comprarProducto(producto)}
-                      disabled={producto.stock <= 0 || comprandoId === producto.id}
-                      style={{
-                        width: "100%",
-                        marginTop: "16px",
-                        background:
-                          producto.stock > 0
-                            ? "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)"
-                            : "#e6c7d7",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "16px",
-                        padding: "13px",
-                        fontWeight: "bold",
-                        fontSize: "16px",
-                        cursor: producto.stock > 0 ? "pointer" : "not-allowed",
-                      }}
-                    >
-                      {comprandoId === producto.id
-                        ? "Procesando..."
-                        : producto.stock > 0
-                        ? "Comprar"
-                        : "Agotado"}
-                    </button>
+                      <p
+                        style={{
+                          color: "#d55d95",
+                          fontWeight: "bold",
+                          fontSize: "28px",
+                          marginTop: "14px",
+                        }}
+                      >
+                        {displayPrice} créditos
+                      </p>
+
+                      <p
+                        style={{
+                          color: producto.stock > 0 ? "#8b5d75" : "#c5578b",
+                          marginTop: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {producto.stock > 0
+                          ? "Stock disponible: " + producto.stock
+                          : "Agotado"}
+                      </p>
+
+                      <button
+                        onClick={() => comprarProducto(producto)}
+                        disabled={producto.stock <= 0 || comprandoId === producto.id}
+                        style={{
+                          width: "100%",
+                          marginTop: "16px",
+                          background:
+                            producto.stock > 0
+                              ? "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)"
+                              : "#e6c7d7",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "16px",
+                          padding: "13px",
+                          fontWeight: "bold",
+                          fontSize: "16px",
+                          cursor: producto.stock > 0 ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {comprandoId === producto.id
+                          ? "Procesando..."
+                          : producto.stock > 0
+                          ? "Comprar"
+                          : "Agotado"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
