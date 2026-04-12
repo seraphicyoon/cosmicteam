@@ -3,652 +3,505 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-function getStatusStyle(status) {
-  const s = (status || "").toLowerCase();
+function parseOptions(optionsText) {
+  const text = (optionsText || "").trim();
+  if (!text) return [];
 
-  if (s.includes("pendiente")) {
-    return {
-      background: "#fff2f8",
-      color: "#cc6f9b",
-      border: "1px solid #f4c5db",
-    };
-  }
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|");
+      const label = (parts[0] || "").trim();
+      const price = Number((parts[1] || "").trim());
 
-  if (s.includes("verificando")) {
-    return {
-      background: "#fff7ec",
-      color: "#c98a3d",
-      border: "1px solid #f1d3a6",
-    };
-  }
+      if (!label || Number.isNaN(price)) return null;
 
-  if (s.includes("esperando")) {
-    return {
-      background: "#f8f4ff",
-      color: "#8f6ccf",
-      border: "1px solid #d8caf7",
-    };
-  }
-
-  if (s.includes("preparacion")) {
-    return {
-      background: "#eef7ff",
-      color: "#4f88c7",
-      border: "1px solid #c9def7",
-    };
-  }
-
-  if (s.includes("entrega")) {
-    return {
-      background: "#eefcf3",
-      color: "#4c9a69",
-      border: "1px solid #c9ebd3",
-    };
-  }
-
-  if (s.includes("cancelado")) {
-    return {
-      background: "#fff1f1",
-      color: "#c56b6b",
-      border: "1px solid #efc6c6",
-    };
-  }
-
-  return {
-    background: "#fff7fb",
-    color: "#8d6278",
-    border: "1px solid #f4c5db",
-  };
+      return { label, price };
+    })
+    .filter(Boolean);
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "Sin fecha";
-
-  const date = new Date(dateString);
-
-  return date.toLocaleString("es-MX", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-export default function CuentaPage() {
-  const [perfil, setPerfil] = useState(null);
-  const [pedidos, setPedidos] = useState([]);
-  const [mensajesPorPedido, setMensajesPorPedido] = useState({});
-  const [nuevoMensaje, setNuevoMensaje] = useState({});
+export default function Home() {
+  const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [perfil, setPerfil] = useState(null);
+  const [mensaje, setMensaje] = useState("");
+  const [comprandoId, setComprandoId] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState({});
 
-  async function cargarMensajes(orderIds) {
-    if (!orderIds || orderIds.length === 0) {
-      setMensajesPorPedido({});
-      return;
-    }
+  useEffect(() => {
+    cargarTodo();
 
-    const { data: mensajesData } = await supabase
-      .from("order_messages")
-      .select("*")
-      .in("order_id", orderIds)
-      .order("created_at", { ascending: true });
-
-    const mensajesMap = {};
-    (mensajesData || []).forEach((msg) => {
-      if (!mensajesMap[msg.order_id]) {
-        mensajesMap[msg.order_id] = [];
-      }
-      mensajesMap[msg.order_id].push(msg);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      cargarTodo();
     });
 
-    setMensajesPorPedido(mensajesMap);
-  }
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
-  async function cargarCuenta(showLoading = true) {
-    if (showLoading) setCargando(true);
+  async function cargarTodo() {
+    setCargando(true);
 
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      if (!session?.user) {
-        if (showLoading) setCargando(false);
-        window.location.href = "/login";
-        return;
-      }
-
-      const { data: perfilData, error: perfilError } = await supabase
+    if (session?.user) {
+      const { data: perfilData } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      if (perfilError || !perfilData) {
-        if (showLoading) setCargando(false);
-        window.location.href = "/login";
+      setPerfil(perfilData || null);
+    } else {
+      setPerfil(null);
+    }
+
+    const { data: productosData, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      const items = productosData || [];
+      setProductos(items);
+
+      const initialSelections = {};
+      items.forEach((p) => {
+        const options = parseOptions(p.options_text);
+        if (options.length > 0) {
+          initialSelections[p.id] = options[0];
+        }
+      });
+      setSelectedOptions(initialSelections);
+    } else {
+      setProductos([]);
+    }
+
+    setCargando(false);
+  }
+
+  async function comprarProducto(producto) {
+    setMensaje("");
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const selectedOption = selectedOptions[producto.id] || null;
+
+    const finalName = selectedOption
+      ? `${producto.name} - ${selectedOption.label}`
+      : producto.name;
+
+    const finalPrice = selectedOption
+      ? Number(selectedOption.price)
+      : Number(producto.price);
+
+    try {
+      setComprandoId(producto.id);
+
+      const { data, error } = await supabase.rpc("buy_product", {
+        p_product_id: producto.id,
+        p_final_name: finalName,
+        p_final_price: finalPrice,
+      });
+
+      if (error) {
+        setMensaje("No se pudo completar la compra: " + error.message);
         return;
       }
 
-      const { data: pedidosData } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false });
+      setMensaje(
+        "Compra realizada con éxito 💖 Tu pedido de " +
+          (data?.product_name || finalName) +
+          " fue registrado. Revisa tu cuenta para ver el estado, la entrega y el chat del pedido."
+      );
 
-      const pedidosFinal = pedidosData || [];
-      const ids = pedidosFinal.map((p) => p.id);
-
-      setPerfil(perfilData);
-      setPedidos(pedidosFinal);
-      await cargarMensajes(ids);
-
-      if (showLoading) setCargando(false);
+      await cargarTodo();
     } catch (e) {
-      if (showLoading) setCargando(false);
-      window.location.href = "/login";
+      setMensaje("Ocurrió un error inesperado al comprar.");
+    } finally {
+      setComprandoId(null);
     }
   }
-
-  useEffect(() => {
-    let mounted = true;
-    let intervalId;
-
-    async function init() {
-      if (!mounted) return;
-      await cargarCuenta(true);
-
-      intervalId = setInterval(async () => {
-        if (!mounted) return;
-        await cargarCuenta(false);
-      }, 3000);
-    }
-
-    init();
-
-    return () => {
-      mounted = false;
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, []);
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
-
-  async function enviarMensaje(orderId) {
-    const texto = (nuevoMensaje[orderId] || "").trim();
-    if (!texto || !perfil) return;
-
-    const pedido = pedidos.find((p) => p.id === orderId);
-    if (pedido?.chat_closed) return;
-
-    const { data, error } = await supabase
-      .from("order_messages")
-      .insert([
-        {
-          order_id: orderId,
-          user_id: perfil.id,
-          sender_role: perfil.role === "admin" ? "admin" : "user",
-          message: texto,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) return;
-
-    setMensajesPorPedido((prev) => ({
-      ...prev,
-      [orderId]: [...(prev[orderId] || []), data],
-    }));
-
-    setNuevoMensaje((prev) => ({
-      ...prev,
-      [orderId]: "",
-    }));
-  }
-
-  if (cargando) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Arial, sans-serif",
-          background:
-            "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
-        }}
-      >
-        Cargando tu cuenta...
-      </main>
-    );
-  }
-
-  const username = perfil?.username || "clienta";
 
   return (
     <main
       style={{
         minHeight: "100vh",
         background:
-          "linear-gradient(180deg, #fff8fc 0%, #ffeef7 50%, #fffaf3 100%)",
-        padding: "24px",
+          "linear-gradient(180deg, #fff7fb 0%, #ffeef6 35%, #fffaf2 100%)",
+        color: "#6b3153",
         fontFamily: "Arial, sans-serif",
-        color: "#7c4a65",
+        padding: "24px",
       }}
     >
-      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <div
           style={{
-            background: "rgba(255,255,255,0.9)",
-            border: "1px solid #f4c5db",
+            border: "1px solid #f5bfd6",
             borderRadius: "28px",
-            padding: "28px",
-            boxShadow: "0 12px 30px rgba(233, 145, 184, 0.18)",
+            padding: "24px 28px",
+            background: "rgba(255,255,255,0.85)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "20px",
+            flexWrap: "wrap",
+            boxShadow: "0 10px 30px rgba(244, 182, 210, 0.25)",
           }}
         >
+          <div>
+            <div
+              style={{
+                color: "#d96c9d",
+                fontSize: "14px",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "8px",
+                fontWeight: "bold",
+              }}
+            >
+              Tienda digital
+            </div>
+
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "40px",
+                color: "#c95c93",
+              }}
+            >
+              COSMICTEAM
+            </h1>
+
+            <p style={{ marginTop: "10px", color: "#8b5d75" }}>
+              Servicios digitales, recargas y compras por créditos.
+            </p>
+          </div>
+
+          <div
+            style={{
+              background: "#fff8fc",
+              border: "1px solid #f5bfd6",
+              borderRadius: "20px",
+              padding: "14px 18px",
+              minWidth: "220px",
+              textAlign: "right",
+              boxShadow: "0 6px 18px rgba(244, 182, 210, 0.18)",
+            }}
+          >
+            <div style={{ color: "#9f7389", fontSize: "13px" }}>
+              {perfil ? "Saldo de " + perfil.username : "Saldo"}
+            </div>
+            <div
+              style={{
+                color: "#d55d95",
+                fontSize: "30px",
+                fontWeight: "bold",
+              }}
+            >
+              {perfil ? (perfil.balance ?? 0) + " créditos" : "Inicia sesión"}
+            </div>
+          </div>
+        </div>
+
+        {mensaje ? (
+          <div
+            style={{
+              marginTop: "18px",
+              padding: "14px",
+              borderRadius: "16px",
+              background: "#fff7fb",
+              border: "1px solid #f4c5db",
+              color: "#8a4f6e",
+              fontSize: "14px",
+              lineHeight: 1.5,
+            }}
+          >
+            {mensaje}
+          </div>
+        ) : null}
+
+        <div
+          style={{
+            marginTop: "24px",
+            border: "1px solid #f7d6e5",
+            borderRadius: "24px",
+            padding: "18px 22px",
+            background: "rgba(255,255,255,0.78)",
+            boxShadow: "0 8px 20px rgba(244, 182, 210, 0.14)",
+          }}
+        >
+          <p style={{ margin: 0, color: "#8b5d75" }}>
+            {perfil ? (
+              <>
+                Bienvenida <strong>{perfil.username}</strong> a{" "}
+                <strong>COSMICTEAM</strong>.
+              </>
+            ) : (
+              <>
+                Bienvenida a <strong>COSMICTEAM</strong>.
+              </>
+            )}
+          </p>
+
+          <p
+            style={{
+              marginTop: "8px",
+              color: "#d96c9d",
+              fontWeight: "bold",
+            }}
+          >
+            1 crédito = 1 peso
+          </p>
+        </div>
+
+        <div style={{ marginTop: "34px" }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
-              gap: "16px",
-              flexWrap: "wrap",
+              gap: "12px",
               alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: "18px",
             }}
           >
-            <div>
-              <p
-                style={{
-                  margin: 0,
-                  color: "#d46a98",
-                  fontSize: "13px",
-                  letterSpacing: "2px",
-                  textTransform: "uppercase",
-                  fontWeight: "bold",
-                }}
-              >
-                Mi cuenta
-              </p>
-
-              <h1
-                style={{
-                  margin: "10px 0 8px 0",
-                  fontSize: "34px",
-                  color: "#c5578b",
-                }}
-              >
-                Hola, {username} 💖
-              </h1>
-
-              <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí podrás revisar tu saldo, recargar y ver tus compras.
-              </p>
-            </div>
+            <h2
+              style={{
+                fontSize: "32px",
+                margin: 0,
+                color: "#c95c93",
+              }}
+            >
+              Servicios disponibles
+            </h2>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <a
-                href="/"
-                style={{
-                  textDecoration: "none",
-                  background: "#fff",
-                  color: "#9a6b82",
-                  padding: "12px 16px",
-                  borderRadius: "14px",
-                  fontWeight: "bold",
-                  border: "1px solid #f4c5db",
-                }}
-              >
-                Ir a la tienda
-              </a>
-
-              {perfil?.role === "admin" ? (
+              {!perfil ? (
                 <a
-                  href="/admin"
+                  href="/login"
                   style={{
                     textDecoration: "none",
-                    background: "#fff",
-                    color: "#9a6b82",
+                    background:
+                      "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                    color: "white",
                     padding: "12px 16px",
-                    borderRadius: "14px",
+                    borderRadius: "16px",
                     fontWeight: "bold",
-                    border: "1px solid #f4c5db",
                   }}
                 >
-                  Panel admin
+                  Iniciar sesión
                 </a>
-              ) : null}
+              ) : (
+                <>
+                  <a
+                    href="/cuenta"
+                    style={{
+                      textDecoration: "none",
+                      background:
+                        "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)",
+                      color: "white",
+                      padding: "12px 16px",
+                      borderRadius: "16px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Mi cuenta
+                  </a>
 
-              <button
-                onClick={cerrarSesion}
-                style={{
-                  padding: "12px 18px",
-                  borderRadius: "16px",
-                  border: "none",
-                  background: "#e98ab3",
-                  color: "white",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "24px",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "18px",
-            }}
-          >
-            <div
-              style={{
-                background: "#fff7fb",
-                border: "1px solid #f4c5db",
-                borderRadius: "22px",
-                padding: "20px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#9f6c84", fontSize: "14px" }}>
-                Usuario
-              </p>
-              <h3 style={{ margin: "10px 0 0 0", color: "#c5578b", fontSize: "26px" }}>
-                {username}
-              </h3>
-            </div>
-
-            <div
-              style={{
-                background: "#fff7fb",
-                border: "1px solid #f4c5db",
-                borderRadius: "22px",
-                padding: "20px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#9f6c84", fontSize: "14px" }}>
-                Saldo disponible
-              </p>
-              <h3 style={{ margin: "10px 0 0 0", color: "#c5578b", fontSize: "26px" }}>
-                {perfil?.balance ?? 0} créditos
-              </h3>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Recargar saldo</h2>
-
-            <p style={{ color: "#8d6278", lineHeight: 1.7 }}>
-              Para recargar tu saldo, únete al grupo de WhatsApp y solicita los datos
-              bancarios para hacer tu transferencia.
-            </p>
-
-            <div
-              style={{
-                background: "#fffdff",
-                border: "1px solid #f4c5db",
-                borderRadius: "18px",
-                padding: "16px",
-                color: "#8d6278",
-                lineHeight: 1.8,
-              }}
-            >
-              <strong style={{ color: "#c5578b" }}>Instrucciones:</strong>
-              <br />
-              1. Únete al grupo de WhatsApp.
-              <br />
-              2. Pide los datos bancarios de transferencia.
-              <br />
-              3. Realiza tu pago.
-              <br />
-              4. Envía en el grupo tu comprobante de pago.
-              <br />
-              5. Escribe también tu nombre de usuario:
-              <br />
-              <strong style={{ color: "#c5578b" }}>{username}</strong>
-              <br />
-              6. Un administrador revisará tu pago y añadirá el saldo a tu cuenta.
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Mis pedidos</h2>
-
-            {pedidos.length === 0 ? (
-              <p style={{ color: "#8d6278" }}>Todavía no tienes pedidos.</p>
-            ) : (
-              <div style={{ display: "grid", gap: "12px" }}>
-                {pedidos.map((pedido) => {
-                  const statusStyle = getStatusStyle(pedido.status);
-                  const mensajes = mensajesPorPedido[pedido.id] || [];
-
-                  return (
-                    <div
-                      key={pedido.id}
+                  {perfil.role === "admin" ? (
+                    <a
+                      href="/admin"
                       style={{
+                        textDecoration: "none",
                         background: "#fff",
+                        color: "#9a6b82",
+                        padding: "12px 16px",
+                        borderRadius: "16px",
+                        fontWeight: "bold",
                         border: "1px solid #f4c5db",
-                        borderRadius: "18px",
-                        padding: "16px",
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: "12px",
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                          {pedido.product_name}
-                        </div>
-
-                        <div
-                          style={{
-                            ...statusStyle,
-                            borderRadius: "999px",
-                            padding: "8px 12px",
-                            fontWeight: "bold",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {pedido.status}
-                        </div>
-                      </div>
-
-                      <div style={{ color: "#8d6278", marginTop: "8px" }}>
-                        Precio: {pedido.price} créditos
-                      </div>
-
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Fecha: {formatDate(pedido.created_at)}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          padding: "8px 12px",
-                          borderRadius: "12px",
-                          background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
-                          color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
-                          border: pedido.chat_closed
-                            ? "1px solid #efc6c6"
-                            : "1px solid #c9ebd3",
-                          fontWeight: "bold",
-                          fontSize: "14px",
-                          display: "inline-block",
-                        }}
-                      >
-                        {pedido.chat_closed ? "Chat cerrado por admin" : "Chat abierto"}
-                      </div>
-
-                      {pedido.delivery_message ? (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            background: "#fff7fb",
-                            border: "1px solid #f4c5db",
-                            color: "#8d6278",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          <strong style={{ color: "#c5578b" }}>Entrega:</strong>
-                          <br />
-                          {pedido.delivery_message}
-                        </div>
-                      ) : null}
-
-                      {pedido.admin_comment ? (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            background: "#fff7fb",
-                            border: "1px solid #f4c5db",
-                            color: "#8d6278",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          <strong style={{ color: "#c5578b" }}>Comentario:</strong>
-                          <br />
-                          {pedido.admin_comment}
-                        </div>
-                      ) : null}
-
-                      <div
-                        style={{
-                          marginTop: "14px",
-                          background: "#fffafc",
-                          border: "1px solid #f4c5db",
-                          borderRadius: "16px",
-                          padding: "14px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: "bold",
-                            color: "#c5578b",
-                            marginBottom: "10px",
-                          }}
-                        >
-                          Chat del pedido
-                        </div>
-
-                        <div style={{ display: "grid", gap: "10px" }}>
-                          {mensajes.length === 0 ? (
-                            <div style={{ color: "#8d6278", fontSize: "14px" }}>
-                              Todavía no hay mensajes en este pedido.
-                            </div>
-                          ) : (
-                            mensajes.map((msg) => (
-                              <div
-                                key={msg.id}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: "12px",
-                                  background:
-                                    msg.sender_role === "admin" ? "#fff1f7" : "#f9f7ff",
-                                  border: "1px solid #f1d5e3",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: "bold",
-                                    color: "#b36088",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {msg.sender_role === "admin" ? "Admin" : "Tú"} ·{" "}
-                                  {formatDate(msg.created_at)}
-                                </div>
-                                <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
-                                  {msg.message}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
-                          <textarea
-                            rows={3}
-                            placeholder={
-                              pedido.chat_closed
-                                ? "Este chat fue cerrado por admin."
-                                : "Escribe un mensaje sobre este pedido..."
-                            }
-                            value={nuevoMensaje[pedido.id] || ""}
-                            onChange={(e) =>
-                              setNuevoMensaje((prev) => ({
-                                ...prev,
-                                [pedido.id]: e.target.value,
-                              }))
-                            }
-                            disabled={pedido.chat_closed}
-                            style={{
-                              width: "100%",
-                              padding: "12px",
-                              borderRadius: "12px",
-                              border: "1px solid #f4c5db",
-                              fontSize: "15px",
-                              resize: "vertical",
-                              boxSizing: "border-box",
-                              background: pedido.chat_closed ? "#f7f2f5" : "white",
-                            }}
-                          />
-
-                          <button
-                            onClick={() => enviarMensaje(pedido.id)}
-                            disabled={pedido.chat_closed}
-                            style={{
-                              border: "none",
-                              background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
-                              color: "white",
-                              borderRadius: "12px",
-                              padding: "10px 14px",
-                              fontWeight: "bold",
-                              cursor: pedido.chat_closed ? "not-allowed" : "pointer",
-                              width: "fit-content",
-                            }}
-                          >
-                            Enviar mensaje
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      Admin
+                    </a>
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
+
+          {cargando ? (
+            <p style={{ color: "#8b5d75" }}>Cargando productos...</p>
+          ) : productos.length === 0 ? (
+            <div
+              style={{
+                background: "rgba(255,255,255,0.92)",
+                border: "1px solid #f5bfd6",
+                borderRadius: "26px",
+                padding: "20px",
+                color: "#8b5d75",
+              }}
+            >
+              No hay productos activos todavía.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: "22px",
+              }}
+            >
+              {productos.map((producto) => {
+                const options = parseOptions(producto.options_text);
+                const selectedOption = selectedOptions[producto.id] || null;
+                const displayPrice = selectedOption
+                  ? selectedOption.price
+                  : producto.price;
+
+                return (
+                  <div
+                    key={producto.id}
+                    style={{
+                      background: "rgba(255,255,255,0.92)",
+                      border: "1px solid #f5bfd6",
+                      borderRadius: "26px",
+                      overflow: "hidden",
+                      boxShadow: "0 10px 24px rgba(244, 182, 210, 0.22)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "170px",
+                        background:
+                          "linear-gradient(135deg, #ffd9ea 0%, #fff0f7 45%, #ffe7bf 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "28px",
+                        fontWeight: "bold",
+                        color: "#c95c93",
+                        textAlign: "center",
+                        padding: "12px",
+                      }}
+                    >
+                      {producto.name}
+                    </div>
+
+                    <div style={{ padding: "18px" }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: "24px",
+                          color: "#a84d7c",
+                        }}
+                      >
+                        {producto.name}
+                      </h3>
+
+                      <p style={{ color: "#8b5d75", marginTop: "10px" }}>
+                        {producto.description || "Sin descripción"}
+                      </p>
+
+                      {options.length > 0 ? (
+                        <select
+                          value={selectedOption?.label || options[0].label}
+                          onChange={(e) => {
+                            const found = options.find(
+                              (opt) => opt.label === e.target.value
+                            );
+                            setSelectedOptions((prev) => ({
+                              ...prev,
+                              [producto.id]: found || options[0],
+                            }));
+                          }}
+                          style={{
+                            width: "100%",
+                            marginTop: "12px",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px solid #f4c5db",
+                            fontSize: "15px",
+                          }}
+                        >
+                          {options.map((opt) => (
+                            <option key={opt.label} value={opt.label}>
+                              {opt.label} - {opt.price} créditos
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+
+                      <p
+                        style={{
+                          color: "#d55d95",
+                          fontWeight: "bold",
+                          fontSize: "28px",
+                          marginTop: "14px",
+                        }}
+                      >
+                        {displayPrice} créditos
+                      </p>
+
+                      <p
+                        style={{
+                          color: producto.stock > 0 ? "#8b5d75" : "#c5578b",
+                          marginTop: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {producto.stock > 0
+                          ? "Stock disponible: " + producto.stock
+                          : "Agotado"}
+                      </p>
+
+                      <button
+                        onClick={() => comprarProducto(producto)}
+                        disabled={producto.stock <= 0 || comprandoId === producto.id}
+                        style={{
+                          width: "100%",
+                          marginTop: "16px",
+                          background:
+                            producto.stock > 0
+                              ? "linear-gradient(90deg, #f59ac2 0%, #e97fb0 100%)"
+                              : "#e6c7d7",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "16px",
+                          padding: "13px",
+                          fontWeight: "bold",
+                          fontSize: "16px",
+                          cursor: producto.stock > 0 ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {comprandoId === producto.id
+                          ? "Procesando..."
+                          : producto.stock > 0
+                          ? "Comprar"
+                          : "Agotado"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </main>
