@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 function getStatusStyle(status) {
@@ -75,6 +75,28 @@ function formatDate(dateString) {
   });
 }
 
+function TabButton({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: "none",
+        background: active ? "#e98ab3" : "#fff",
+        color: active ? "white" : "#9a6b82",
+        borderRadius: "14px",
+        padding: "12px 16px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        borderWidth: active ? "0" : "1px",
+        borderStyle: "solid",
+        borderColor: "#f4c5db",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function AdminPage() {
   const [perfil, setPerfil] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
@@ -95,6 +117,8 @@ export default function AdminPage() {
     active: true,
     options_text: "",
   });
+  const [activeTab, setActiveTab] = useState("resumen");
+  const [expandedOrders, setExpandedOrders] = useState({});
 
   useEffect(() => {
     let mounted = true;
@@ -215,6 +239,31 @@ export default function AdminPage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, []);
+
+  const stats = useMemo(() => {
+    const pedidosPendientes = pedidos.filter((p) =>
+      (p.status || "").toLowerCase().includes("pendiente")
+    ).length;
+
+    const pedidosAbiertos = pedidos.filter((p) => !p.chat_closed).length;
+    const productosActivos = productos.filter((p) => p.active).length;
+
+    return {
+      usuarios: usuarios.length,
+      pedidos: pedidos.length,
+      pendientes: pedidosPendientes,
+      chatsAbiertos: pedidosAbiertos,
+      productos: productos.length,
+      productosActivos,
+    };
+  }, [usuarios, pedidos, productos]);
+
+  const toggleOrder = (pedidoId) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [pedidoId]: !prev[pedidoId],
+    }));
+  };
 
   const guardarSaldo = async (id) => {
     setMensaje("");
@@ -363,15 +412,7 @@ export default function AdminPage() {
     setProductos((prev) =>
       prev.map((p) =>
         p.id === productoId
-          ? {
-              ...p,
-              name,
-              description,
-              price,
-              stock,
-              active,
-              options_text,
-            }
+          ? { ...p, name, description, price, stock, active, options_text }
           : p
       )
     );
@@ -553,7 +594,7 @@ export default function AdminPage() {
         color: "#7c4a65",
       }}
     >
-      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1150px", margin: "0 auto" }}>
         <div
           style={{
             background: "rgba(255,255,255,0.92)",
@@ -597,7 +638,7 @@ export default function AdminPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí puedes editar saldo, pedidos y productos completos.
+                Todo está más ordenado por secciones.
               </p>
             </div>
 
@@ -652,815 +693,137 @@ export default function AdminPage() {
 
           <div
             style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
+              marginTop: "22px",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
             }}
           >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Crear producto nuevo</h2>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: "12px",
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Nombre del producto"
-                value={nuevoProducto.name}
-                onChange={(e) =>
-                  setNuevoProducto((prev) => ({ ...prev, name: e.target.value }))
-                }
-                style={{
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "1px solid #f4c5db",
-                  fontSize: "15px",
-                }}
-              />
-
-              <input
-                type="text"
-                placeholder="Descripción"
-                value={nuevoProducto.description}
-                onChange={(e) =>
-                  setNuevoProducto((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                style={{
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "1px solid #f4c5db",
-                  fontSize: "15px",
-                }}
-              />
-
-              <input
-                type="number"
-                min="0"
-                placeholder="Precio base"
-                value={nuevoProducto.price}
-                onChange={(e) =>
-                  setNuevoProducto((prev) => ({ ...prev, price: e.target.value }))
-                }
-                style={{
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "1px solid #f4c5db",
-                  fontSize: "15px",
-                }}
-              />
-
-              <input
-                type="number"
-                min="0"
-                placeholder="Stock"
-                value={nuevoProducto.stock}
-                onChange={(e) =>
-                  setNuevoProducto((prev) => ({ ...prev, stock: e.target.value }))
-                }
-                style={{
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "1px solid #f4c5db",
-                  fontSize: "15px",
-                }}
-              />
-            </div>
-
-            <textarea
-              placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
-              value={nuevoProducto.options_text}
-              onChange={(e) =>
-                setNuevoProducto((prev) => ({
-                  ...prev,
-                  options_text: e.target.value,
-                }))
-              }
-              rows={6}
-              style={{
-                width: "100%",
-                marginTop: "12px",
-                padding: "12px",
-                borderRadius: "12px",
-                border: "1px solid #f4c5db",
-                fontSize: "15px",
-                resize: "vertical",
-                boxSizing: "border-box",
-              }}
-            />
-
-            <div
-              style={{
-                marginTop: "14px",
-                display: "flex",
-                gap: "12px",
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  color: "#8d6278",
-                  fontWeight: "bold",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={nuevoProducto.active}
-                  onChange={(e) =>
-                    setNuevoProducto((prev) => ({
-                      ...prev,
-                      active: e.target.checked,
-                    }))
-                  }
-                />
-                Activo
-              </label>
-
-              <button
-                onClick={crearProducto}
-                style={{
-                  border: "none",
-                  background: "#e98ab3",
-                  color: "white",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                Crear producto
-              </button>
-            </div>
+            <TabButton active={activeTab === "resumen"} onClick={() => setActiveTab("resumen")}>
+              Resumen
+            </TabButton>
+            <TabButton active={activeTab === "pedidos"} onClick={() => setActiveTab("pedidos")}>
+              Pedidos
+            </TabButton>
+            <TabButton active={activeTab === "usuarias"} onClick={() => setActiveTab("usuarias")}>
+              Usuarias
+            </TabButton>
+            <TabButton active={activeTab === "productos"} onClick={() => setActiveTab("productos")}>
+              Productos
+            </TabButton>
           </div>
 
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Usuarias registradas</h2>
-
-            <div style={{ display: "grid", gap: "14px" }}>
-              {usuarios.map((usuario) => (
+          {activeTab === "resumen" ? (
+            <div
+              style={{
+                marginTop: "24px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "16px",
+              }}
+            >
+              {[
+                ["Usuarias", stats.usuarios],
+                ["Pedidos", stats.pedidos],
+                ["Pendientes", stats.pendientes],
+                ["Chats abiertos", stats.chatsAbiertos],
+                ["Productos", stats.productos],
+                ["Productos activos", stats.productosActivos],
+              ].map(([label, value]) => (
                 <div
-                  key={usuario.id}
+                  key={label}
                   style={{
-                    background: "#fff",
+                    background: "#fff7fb",
                     border: "1px solid #f4c5db",
-                    borderRadius: "18px",
-                    padding: "16px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "16px",
-                    flexWrap: "wrap",
+                    borderRadius: "22px",
+                    padding: "20px",
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                      {usuario.username}
-                    </div>
-                    <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                      Rol: {usuario.role}
-                    </div>
-                    <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                      Saldo actual: {usuario.balance ?? 0} créditos
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      type="number"
-                      min="0"
-                      value={saldosEditados[usuario.id] ?? 0}
-                      onChange={(e) =>
-                        setSaldosEditados((prev) => ({
-                          ...prev,
-                          [usuario.id]: e.target.value,
-                        }))
-                      }
-                      style={{
-                        width: "120px",
-                        padding: "10px 12px",
-                        borderRadius: "12px",
-                        border: "1px solid #f4c5db",
-                        fontSize: "15px",
-                      }}
-                    />
-
-                    <button
-                      onClick={() => guardarSaldo(usuario.id)}
-                      style={{
-                        border: "none",
-                        background: "#e98ab3",
-                        color: "white",
-                        borderRadius: "12px",
-                        padding: "10px 14px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Guardar saldo
-                    </button>
+                  <div style={{ color: "#9f6c84", fontSize: "14px" }}>{label}</div>
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      fontSize: "32px",
+                      fontWeight: "bold",
+                      color: "#c5578b",
+                    }}
+                  >
+                    {value}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          ) : null}
 
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Pedidos</h2>
+          {activeTab === "usuarias" ? (
+            <div
+              style={{
+                marginTop: "24px",
+                background: "#fff7fb",
+                border: "1px solid #f4c5db",
+                borderRadius: "22px",
+                padding: "20px",
+              }}
+            >
+              <h2 style={{ marginTop: 0, color: "#c5578b" }}>Usuarias registradas</h2>
 
-            {pedidos.length === 0 ? (
-              <p style={{ color: "#8d6278" }}>Todavía no hay pedidos.</p>
-            ) : (
               <div style={{ display: "grid", gap: "14px" }}>
-                {pedidos.map((pedido) => {
-                  const statusStyle = getStatusStyle(pedido.status);
-                  const mensajes = mensajesPorPedido[pedido.id] || [];
-
-                  return (
-                    <div
-                      key={pedido.id}
-                      style={{
-                        background: "#fff",
-                        border: "1px solid #f4c5db",
-                        borderRadius: "18px",
-                        padding: "16px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: "16px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                            {pedido.product_name}
-                          </div>
-                          <div style={{ color: "#8d6278", marginTop: "6px" }}>
-                            Usuaria: {obtenerUsername(pedido.user_id)}
-                          </div>
-                          <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                            Precio: {pedido.price} créditos
-                          </div>
-                          <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                            Fecha: {formatDate(pedido.created_at)}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            ...statusStyle,
-                            borderRadius: "999px",
-                            padding: "8px 12px",
-                            fontWeight: "bold",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {pedido.status}
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "14px" }}>
-                        <button
-                          onClick={() => cambiarEstadoPedido(pedido.id, "Pendiente")}
-                          style={{
-                            border: "none",
-                            background: "#f3a1c7",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Pendiente
-                        </button>
-
-                        <button
-                          onClick={() => cambiarEstadoPedido(pedido.id, "Verificando")}
-                          style={{
-                            border: "none",
-                            background: "#e98ab3",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Verificando
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            cambiarEstadoPedido(pedido.id, "Esperando para tomar Orden")
-                          }
-                          style={{
-                            border: "none",
-                            background: "#d96c9d",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Esperando para tomar Orden
-                        </button>
-
-                        <button
-                          onClick={() => cambiarEstadoPedido(pedido.id, "Preparacion")}
-                          style={{
-                            border: "none",
-                            background: "#c5578b",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Preparacion
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            cambiarEstadoPedido(
-                              pedido.id,
-                              "Entrega (El Vendedor ha enviado)"
-                            )
-                          }
-                          style={{
-                            border: "none",
-                            background: "#b84d82",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Entrega
-                        </button>
-
-                        <button
-                          onClick={() => cambiarEstadoPedido(pedido.id, "Cancelado")}
-                          style={{
-                            border: "none",
-                            background: "#94456b",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Cancelado
-                        </button>
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-                        {!pedido.chat_closed ? (
-                          <button
-                            onClick={() => cambiarEstadoChat(pedido.id, true)}
-                            style={{
-                              border: "none",
-                              background: "#94456b",
-                              color: "white",
-                              borderRadius: "12px",
-                              padding: "10px 14px",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Cerrar chat
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => cambiarEstadoChat(pedido.id, false)}
-                            style={{
-                              border: "none",
-                              background: "#4c9a69",
-                              color: "white",
-                              borderRadius: "12px",
-                              padding: "10px 14px",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Reabrir chat
-                          </button>
-                        )}
-
-                        <div
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: "12px",
-                            background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
-                            color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
-                            border: pedido.chat_closed
-                              ? "1px solid #efc6c6"
-                              : "1px solid #c9ebd3",
-                            fontWeight: "bold",
-                            fontSize: "14px",
-                          }}
-                        >
-                          {pedido.chat_closed ? "Chat cerrado" : "Chat abierto"}
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: "16px",
-                          display: "grid",
-                          gap: "12px",
-                        }}
-                      >
-                        <textarea
-                          placeholder="Mensaje de entrega opcional: cuenta, contraseña, instrucciones, etc."
-                          value={pedidosEditados[pedido.id]?.delivery_message ?? ""}
-                          onChange={(e) =>
-                            setPedidosEditados((prev) => ({
-                              ...prev,
-                              [pedido.id]: {
-                                ...prev[pedido.id],
-                                delivery_message: e.target.value,
-                              },
-                            }))
-                          }
-                          rows={4}
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            border: "1px solid #f4c5db",
-                            fontSize: "15px",
-                            resize: "vertical",
-                            boxSizing: "border-box",
-                          }}
-                        />
-
-                        <textarea
-                          placeholder="Comentario opcional para la clienta"
-                          value={pedidosEditados[pedido.id]?.admin_comment ?? ""}
-                          onChange={(e) =>
-                            setPedidosEditados((prev) => ({
-                              ...prev,
-                              [pedido.id]: {
-                                ...prev[pedido.id],
-                                admin_comment: e.target.value,
-                              },
-                            }))
-                          }
-                          rows={3}
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            borderRadius: "12px",
-                            border: "1px solid #f4c5db",
-                            fontSize: "15px",
-                            resize: "vertical",
-                            boxSizing: "border-box",
-                          }}
-                        />
-
-                        <div>
-                          <button
-                            onClick={() => guardarDetallePedido(pedido.id)}
-                            style={{
-                              border: "none",
-                              background: "#e98ab3",
-                              color: "white",
-                              borderRadius: "12px",
-                              padding: "10px 14px",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Guardar info del pedido
-                          </button>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: "14px",
-                          background: "#fffafc",
-                          border: "1px solid #f4c5db",
-                          borderRadius: "16px",
-                          padding: "14px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: "bold",
-                            color: "#c5578b",
-                            marginBottom: "10px",
-                          }}
-                        >
-                          Chat del pedido
-                        </div>
-
-                        <div style={{ display: "grid", gap: "10px" }}>
-                          {mensajes.length === 0 ? (
-                            <div style={{ color: "#8d6278", fontSize: "14px" }}>
-                              Todavía no hay mensajes en este pedido.
-                            </div>
-                          ) : (
-                            mensajes.map((msg) => (
-                              <div
-                                key={msg.id}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: "12px",
-                                  background:
-                                    msg.sender_role === "admin" ? "#fff1f7" : "#f9f7ff",
-                                  border: "1px solid #f1d5e3",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: "bold",
-                                    color: "#b36088",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {msg.sender_role === "admin"
-                                    ? "Admin"
-                                    : obtenerUsername(msg.user_id)}{" "}
-                                  · {formatDate(msg.created_at)}
-                                </div>
-                                <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
-                                  {msg.message}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
-                          <textarea
-                            rows={3}
-                            placeholder={
-                              pedido.chat_closed
-                                ? "Este chat está cerrado."
-                                : "Escribe un mensaje para esta orden..."
-                            }
-                            value={nuevoMensaje[pedido.id] || ""}
-                            onChange={(e) =>
-                              setNuevoMensaje((prev) => ({
-                                ...prev,
-                                [pedido.id]: e.target.value,
-                              }))
-                            }
-                            disabled={pedido.chat_closed}
-                            style={{
-                              width: "100%",
-                              padding: "12px",
-                              borderRadius: "12px",
-                              border: "1px solid #f4c5db",
-                              fontSize: "15px",
-                              resize: "vertical",
-                              boxSizing: "border-box",
-                              background: pedido.chat_closed ? "#f7f2f5" : "white",
-                            }}
-                          />
-
-                          <button
-                            onClick={() => enviarMensaje(pedido.id)}
-                            disabled={pedido.chat_closed}
-                            style={{
-                              border: "none",
-                              background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
-                              color: "white",
-                              borderRadius: "12px",
-                              padding: "10px 14px",
-                              fontWeight: "bold",
-                              cursor: pedido.chat_closed ? "not-allowed" : "pointer",
-                              width: "fit-content",
-                            }}
-                          >
-                            Enviar mensaje
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div
-            style={{
-              marginTop: "24px",
-              background: "#fff7fb",
-              border: "1px solid #f4c5db",
-              borderRadius: "22px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ marginTop: 0, color: "#c5578b" }}>Editar productos</h2>
-
-            {productos.length === 0 ? (
-              <p style={{ color: "#8d6278" }}>Todavía no hay productos.</p>
-            ) : (
-              <div style={{ display: "grid", gap: "14px" }}>
-                {productos.map((producto) => (
+                {usuarios.map((usuario) => (
                   <div
-                    key={producto.id}
+                    key={usuario.id}
                     style={{
                       background: "#fff",
                       border: "1px solid #f4c5db",
                       borderRadius: "18px",
                       padding: "16px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                        gap: "12px",
-                      }}
-                    >
-                      <input
-                        type="text"
-                        value={productosEditados[producto.id]?.name ?? ""}
-                        onChange={(e) =>
-                          setProductosEditados((prev) => ({
-                            ...prev,
-                            [producto.id]: {
-                              ...prev[producto.id],
-                              name: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Nombre"
-                        style={{
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                        }}
-                      />
-
-                      <input
-                        type="text"
-                        value={productosEditados[producto.id]?.description ?? ""}
-                        onChange={(e) =>
-                          setProductosEditados((prev) => ({
-                            ...prev,
-                            [producto.id]: {
-                              ...prev[producto.id],
-                              description: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Descripción"
-                        style={{
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                        }}
-                      />
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={productosEditados[producto.id]?.price ?? 0}
-                        onChange={(e) =>
-                          setProductosEditados((prev) => ({
-                            ...prev,
-                            [producto.id]: {
-                              ...prev[producto.id],
-                              price: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Precio base"
-                        style={{
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                        }}
-                      />
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={productosEditados[producto.id]?.stock ?? 0}
-                        onChange={(e) =>
-                          setProductosEditados((prev) => ({
-                            ...prev,
-                            [producto.id]: {
-                              ...prev[producto.id],
-                              stock: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Stock"
-                        style={{
-                          padding: "12px",
-                          borderRadius: "12px",
-                          border: "1px solid #f4c5db",
-                          fontSize: "15px",
-                        }}
-                      />
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
+                        {usuario.username}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                        Rol: {usuario.role}
+                      </div>
+                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                        Saldo actual: {usuario.balance ?? 0} créditos
+                      </div>
                     </div>
 
-                    <textarea
-                      value={productosEditados[producto.id]?.options_text ?? ""}
-                      onChange={(e) =>
-                        setProductosEditados((prev) => ({
-                          ...prev,
-                          [producto.id]: {
-                            ...prev[producto.id],
-                            options_text: e.target.value,
-                          },
-                        }))
-                      }
-                      placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
-                      rows={6}
-                      style={{
-                        width: "100%",
-                        marginTop: "12px",
-                        padding: "12px",
-                        borderRadius: "12px",
-                        border: "1px solid #f4c5db",
-                        fontSize: "15px",
-                        resize: "vertical",
-                        boxSizing: "border-box",
-                      }}
-                    />
-
                     <div
                       style={{
-                        marginTop: "14px",
                         display: "flex",
-                        gap: "12px",
+                        gap: "10px",
                         flexWrap: "wrap",
                         alignItems: "center",
                       }}
                     >
-                      <label
+                      <input
+                        type="number"
+                        min="0"
+                        value={saldosEditados[usuario.id] ?? 0}
+                        onChange={(e) =>
+                          setSaldosEditados((prev) => ({
+                            ...prev,
+                            [usuario.id]: e.target.value,
+                          }))
+                        }
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          color: "#8d6278",
-                          fontWeight: "bold",
+                          width: "120px",
+                          padding: "10px 12px",
+                          borderRadius: "12px",
+                          border: "1px solid #f4c5db",
+                          fontSize: "15px",
                         }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!productosEditados[producto.id]?.active}
-                          onChange={(e) =>
-                            setProductosEditados((prev) => ({
-                              ...prev,
-                              [producto.id]: {
-                                ...prev[producto.id],
-                                active: e.target.checked,
-                              },
-                            }))
-                          }
-                        />
-                        Activo
-                      </label>
+                      />
 
                       <button
-                        onClick={() => guardarProducto(producto.id)}
+                        onClick={() => guardarSaldo(usuario.id)}
                         style={{
                           border: "none",
                           background: "#e98ab3",
@@ -1471,33 +834,777 @@ export default function AdminPage() {
                           cursor: "pointer",
                         }}
                       >
-                        Guardar producto
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          eliminarProducto(producto.id, producto.name)
-                        }
-                        style={{
-                          border: "none",
-                          background: "#94456b",
-                          color: "white",
-                          borderRadius: "12px",
-                          padding: "10px 14px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Eliminar producto
+                        Guardar saldo
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          ) : null}
+
+          {activeTab === "productos" ? (
+            <>
+              <div
+                style={{
+                  marginTop: "24px",
+                  background: "#fff7fb",
+                  border: "1px solid #f4c5db",
+                  borderRadius: "22px",
+                  padding: "20px",
+                }}
+              >
+                <h2 style={{ marginTop: 0, color: "#c5578b" }}>Crear producto nuevo</h2>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "12px",
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Nombre del producto"
+                    value={nuevoProducto.name}
+                    onChange={(e) =>
+                      setNuevoProducto((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    style={{
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1px solid #f4c5db",
+                      fontSize: "15px",
+                    }}
+                  />
+
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={nuevoProducto.description}
+                    onChange={(e) =>
+                      setNuevoProducto((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    style={{
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1px solid #f4c5db",
+                      fontSize: "15px",
+                    }}
+                  />
+
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Precio base"
+                    value={nuevoProducto.price}
+                    onChange={(e) =>
+                      setNuevoProducto((prev) => ({ ...prev, price: e.target.value }))
+                    }
+                    style={{
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1px solid #f4c5db",
+                      fontSize: "15px",
+                    }}
+                  />
+
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Stock"
+                    value={nuevoProducto.stock}
+                    onChange={(e) =>
+                      setNuevoProducto((prev) => ({ ...prev, stock: e.target.value }))
+                    }
+                    style={{
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1px solid #f4c5db",
+                      fontSize: "15px",
+                    }}
+                  />
+                </div>
+
+                <textarea
+                  placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
+                  value={nuevoProducto.options_text}
+                  onChange={(e) =>
+                    setNuevoProducto((prev) => ({
+                      ...prev,
+                      options_text: e.target.value,
+                    }))
+                  }
+                  rows={6}
+                  style={{
+                    width: "100%",
+                    marginTop: "12px",
+                    padding: "12px",
+                    borderRadius: "12px",
+                    border: "1px solid #f4c5db",
+                    fontSize: "15px",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
+
+                <div
+                  style={{
+                    marginTop: "14px",
+                    display: "flex",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      color: "#8d6278",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={nuevoProducto.active}
+                      onChange={(e) =>
+                        setNuevoProducto((prev) => ({
+                          ...prev,
+                          active: e.target.checked,
+                        }))
+                      }
+                    />
+                    Activo
+                  </label>
+
+                  <button
+                    onClick={crearProducto}
+                    style={{
+                      border: "none",
+                      background: "#e98ab3",
+                      color: "white",
+                      borderRadius: "12px",
+                      padding: "12px 16px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Crear producto
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "24px",
+                  background: "#fff7fb",
+                  border: "1px solid #f4c5db",
+                  borderRadius: "22px",
+                  padding: "20px",
+                }}
+              >
+                <h2 style={{ marginTop: 0, color: "#c5578b" }}>Editar productos</h2>
+
+                {productos.length === 0 ? (
+                  <p style={{ color: "#8d6278" }}>Todavía no hay productos.</p>
+                ) : (
+                  <div style={{ display: "grid", gap: "14px" }}>
+                    {productos.map((producto) => (
+                      <div
+                        key={producto.id}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid #f4c5db",
+                          borderRadius: "18px",
+                          padding: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(220px, 1fr))",
+                            gap: "12px",
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={productosEditados[producto.id]?.name ?? ""}
+                            onChange={(e) =>
+                              setProductosEditados((prev) => ({
+                                ...prev,
+                                [producto.id]: {
+                                  ...prev[producto.id],
+                                  name: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Nombre"
+                            style={{
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                            }}
+                          />
+
+                          <input
+                            type="text"
+                            value={productosEditados[producto.id]?.description ?? ""}
+                            onChange={(e) =>
+                              setProductosEditados((prev) => ({
+                                ...prev,
+                                [producto.id]: {
+                                  ...prev[producto.id],
+                                  description: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Descripción"
+                            style={{
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                            }}
+                          />
+
+                          <input
+                            type="number"
+                            min="0"
+                            value={productosEditados[producto.id]?.price ?? 0}
+                            onChange={(e) =>
+                              setProductosEditados((prev) => ({
+                                ...prev,
+                                [producto.id]: {
+                                  ...prev[producto.id],
+                                  price: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Precio base"
+                            style={{
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                            }}
+                          />
+
+                          <input
+                            type="number"
+                            min="0"
+                            value={productosEditados[producto.id]?.stock ?? 0}
+                            onChange={(e) =>
+                              setProductosEditados((prev) => ({
+                                ...prev,
+                                [producto.id]: {
+                                  ...prev[producto.id],
+                                  stock: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="Stock"
+                            style={{
+                              padding: "12px",
+                              borderRadius: "12px",
+                              border: "1px solid #f4c5db",
+                              fontSize: "15px",
+                            }}
+                          />
+                        </div>
+
+                        <textarea
+                          value={productosEditados[producto.id]?.options_text ?? ""}
+                          onChange={(e) =>
+                            setProductosEditados((prev) => ({
+                              ...prev,
+                              [producto.id]: {
+                                ...prev[producto.id],
+                                options_text: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder={"Opciones de precio, una por línea.\nEjemplo:\n1 mes|20\n2 meses|35\n6 meses|90\nAnual|150"}
+                          rows={6}
+                          style={{
+                            width: "100%",
+                            marginTop: "12px",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            border: "1px solid #f4c5db",
+                            fontSize: "15px",
+                            resize: "vertical",
+                            boxSizing: "border-box",
+                          }}
+                        />
+
+                        <div
+                          style={{
+                            marginTop: "14px",
+                            display: "flex",
+                            gap: "12px",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              color: "#8d6278",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!productosEditados[producto.id]?.active}
+                              onChange={(e) =>
+                                setProductosEditados((prev) => ({
+                                  ...prev,
+                                  [producto.id]: {
+                                    ...prev[producto.id],
+                                    active: e.target.checked,
+                                  },
+                                }))
+                              }
+                            />
+                            Activo
+                          </label>
+
+                          <button
+                            onClick={() => guardarProducto(producto.id)}
+                            style={{
+                              border: "none",
+                              background: "#e98ab3",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Guardar producto
+                          </button>
+
+                          <button
+                            onClick={() => eliminarProducto(producto.id, producto.name)}
+                            style={{
+                              border: "none",
+                              background: "#94456b",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "10px 14px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Eliminar producto
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
+
+          {activeTab === "pedidos" ? (
+            <div
+              style={{
+                marginTop: "24px",
+                background: "#fff7fb",
+                border: "1px solid #f4c5db",
+                borderRadius: "22px",
+                padding: "20px",
+              }}
+            >
+              <h2 style={{ marginTop: 0, color: "#c5578b" }}>Pedidos</h2>
+
+              {pedidos.length === 0 ? (
+                <p style={{ color: "#8d6278" }}>Todavía no hay pedidos.</p>
+              ) : (
+                <div style={{ display: "grid", gap: "14px" }}>
+                  {pedidos.map((pedido) => {
+                    const statusStyle = getStatusStyle(pedido.status);
+                    const mensajes = mensajesPorPedido[pedido.id] || [];
+                    const isOpen = !!expandedOrders[pedido.id];
+
+                    return (
+                      <div
+                        key={pedido.id}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid #f4c5db",
+                          borderRadius: "18px",
+                          padding: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "12px",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                color: "#c5578b",
+                                fontSize: "20px",
+                              }}
+                            >
+                              {pedido.product_name}
+                            </div>
+                            <div style={{ color: "#8d6278", marginTop: "6px" }}>
+                              Usuaria: {obtenerUsername(pedido.user_id)}
+                            </div>
+                            <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                              Precio: {pedido.price} créditos
+                            </div>
+                            <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                              Fecha: {formatDate(pedido.created_at)}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <div
+                              style={{
+                                ...statusStyle,
+                                borderRadius: "999px",
+                                padding: "8px 12px",
+                                fontWeight: "bold",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {pedido.status}
+                            </div>
+
+                            <button
+                              onClick={() => toggleOrder(pedido.id)}
+                              style={{
+                                border: "1px solid #f4c5db",
+                                background: "#fff",
+                                color: "#9a6b82",
+                                borderRadius: "12px",
+                                padding: "10px 14px",
+                                fontWeight: "bold",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {isOpen ? "Ocultar" : "Ver pedido"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {!isOpen ? null : (
+                          <>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                flexWrap: "wrap",
+                                marginTop: "14px",
+                              }}
+                            >
+                              <button
+                                onClick={() => cambiarEstadoPedido(pedido.id, "Pendiente")}
+                                style={smallBtn("#f3a1c7")}
+                              >
+                                Pendiente
+                              </button>
+                              <button
+                                onClick={() => cambiarEstadoPedido(pedido.id, "Verificando")}
+                                style={smallBtn("#e98ab3")}
+                              >
+                                Verificando
+                              </button>
+                              <button
+                                onClick={() =>
+                                  cambiarEstadoPedido(
+                                    pedido.id,
+                                    "Esperando para tomar Orden"
+                                  )
+                                }
+                                style={smallBtn("#d96c9d")}
+                              >
+                                Esperando para tomar Orden
+                              </button>
+                              <button
+                                onClick={() =>
+                                  cambiarEstadoPedido(pedido.id, "Preparacion")
+                                }
+                                style={smallBtn("#c5578b")}
+                              >
+                                Preparacion
+                              </button>
+                              <button
+                                onClick={() =>
+                                  cambiarEstadoPedido(
+                                    pedido.id,
+                                    "Entrega (El Vendedor ha enviado)"
+                                  )
+                                }
+                                style={smallBtn("#b84d82")}
+                              >
+                                Entrega
+                              </button>
+                              <button
+                                onClick={() =>
+                                  cambiarEstadoPedido(pedido.id, "Cancelado")
+                                }
+                                style={smallBtn("#94456b")}
+                              >
+                                Cancelado
+                              </button>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "10px",
+                                flexWrap: "wrap",
+                                marginTop: "12px",
+                              }}
+                            >
+                              {!pedido.chat_closed ? (
+                                <button
+                                  onClick={() => cambiarEstadoChat(pedido.id, true)}
+                                  style={smallBtn("#94456b")}
+                                >
+                                  Cerrar chat
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => cambiarEstadoChat(pedido.id, false)}
+                                  style={smallBtn("#4c9a69")}
+                                >
+                                  Reabrir chat
+                                </button>
+                              )}
+
+                              <div
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: "12px",
+                                  background: pedido.chat_closed
+                                    ? "#fff1f1"
+                                    : "#eefcf3",
+                                  color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
+                                  border: pedido.chat_closed
+                                    ? "1px solid #efc6c6"
+                                    : "1px solid #c9ebd3",
+                                  fontWeight: "bold",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                {pedido.chat_closed ? "Chat cerrado" : "Chat abierto"}
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "16px",
+                                display: "grid",
+                                gap: "12px",
+                              }}
+                            >
+                              <textarea
+                                placeholder="Mensaje de entrega opcional: cuenta, contraseña, instrucciones, etc."
+                                value={pedidosEditados[pedido.id]?.delivery_message ?? ""}
+                                onChange={(e) =>
+                                  setPedidosEditados((prev) => ({
+                                    ...prev,
+                                    [pedido.id]: {
+                                      ...prev[pedido.id],
+                                      delivery_message: e.target.value,
+                                    },
+                                  }))
+                                }
+                                rows={4}
+                                style={textAreaStyle}
+                              />
+
+                              <textarea
+                                placeholder="Comentario opcional para la clienta"
+                                value={pedidosEditados[pedido.id]?.admin_comment ?? ""}
+                                onChange={(e) =>
+                                  setPedidosEditados((prev) => ({
+                                    ...prev,
+                                    [pedido.id]: {
+                                      ...prev[pedido.id],
+                                      admin_comment: e.target.value,
+                                    },
+                                  }))
+                                }
+                                rows={3}
+                                style={textAreaStyle}
+                              />
+
+                              <div>
+                                <button
+                                  onClick={() => guardarDetallePedido(pedido.id)}
+                                  style={smallBtn("#e98ab3")}
+                                >
+                                  Guardar info del pedido
+                                </button>
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "14px",
+                                background: "#fffafc",
+                                border: "1px solid #f4c5db",
+                                borderRadius: "16px",
+                                padding: "14px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: "bold",
+                                  color: "#c5578b",
+                                  marginBottom: "10px",
+                                }}
+                              >
+                                Chat del pedido
+                              </div>
+
+                              <div style={{ display: "grid", gap: "10px" }}>
+                                {mensajes.length === 0 ? (
+                                  <div style={{ color: "#8d6278", fontSize: "14px" }}>
+                                    Todavía no hay mensajes en este pedido.
+                                  </div>
+                                ) : (
+                                  mensajes.map((msg) => (
+                                    <div
+                                      key={msg.id}
+                                      style={{
+                                        padding: "10px 12px",
+                                        borderRadius: "12px",
+                                        background:
+                                          msg.sender_role === "admin"
+                                            ? "#fff1f7"
+                                            : "#f9f7ff",
+                                        border: "1px solid #f1d5e3",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          fontWeight: "bold",
+                                          color: "#b36088",
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {msg.sender_role === "admin"
+                                          ? "Admin"
+                                          : obtenerUsername(msg.user_id)}{" "}
+                                        · {formatDate(msg.created_at)}
+                                      </div>
+                                      <div
+                                        style={{
+                                          color: "#7c4a65",
+                                          whiteSpace: "pre-wrap",
+                                        }}
+                                      >
+                                        {msg.message}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div
+                                style={{
+                                  marginTop: "12px",
+                                  display: "grid",
+                                  gap: "10px",
+                                }}
+                              >
+                                <textarea
+                                  rows={3}
+                                  placeholder={
+                                    pedido.chat_closed
+                                      ? "Este chat está cerrado."
+                                      : "Escribe un mensaje para esta orden..."
+                                  }
+                                  value={nuevoMensaje[pedido.id] || ""}
+                                  onChange={(e) =>
+                                    setNuevoMensaje((prev) => ({
+                                      ...prev,
+                                      [pedido.id]: e.target.value,
+                                    }))
+                                  }
+                                  disabled={pedido.chat_closed}
+                                  style={{
+                                    ...textAreaStyle,
+                                    background: pedido.chat_closed
+                                      ? "#f7f2f5"
+                                      : "white",
+                                  }}
+                                />
+
+                                <button
+                                  onClick={() => enviarMensaje(pedido.id)}
+                                  disabled={pedido.chat_closed}
+                                  style={{
+                                    ...smallBtn(
+                                      pedido.chat_closed ? "#d8c5cf" : "#e98ab3"
+                                    ),
+                                    cursor: pedido.chat_closed
+                                      ? "not-allowed"
+                                      : "pointer",
+                                    width: "fit-content",
+                                  }}
+                                >
+                                  Enviar mensaje
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </main>
   );
 }
+
+function smallBtn(background) {
+  return {
+    border: "none",
+    background,
+    color: "white",
+    borderRadius: "12px",
+    padding: "10px 12px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  };
+}
+
+const textAreaStyle = {
+  width: "100%",
+  padding: "12px",
+  borderRadius: "12px",
+  border: "1px solid #f4c5db",
+  fontSize: "15px",
+  resize: "vertical",
+  boxSizing: "border-box",
+};

@@ -81,6 +81,7 @@ export default function CuentaPage() {
   const [mensajesPorPedido, setMensajesPorPedido] = useState({});
   const [nuevoMensaje, setNuevoMensaje] = useState({});
   const [cargando, setCargando] = useState(true);
+  const [expandedOrders, setExpandedOrders] = useState({});
 
   async function cargarMensajes(orderIds) {
     if (!orderIds || orderIds.length === 0) {
@@ -172,6 +173,13 @@ export default function CuentaPage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, []);
+
+  const toggleOrder = (pedidoId) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [pedidoId]: !prev[pedidoId],
+    }));
+  };
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -286,7 +294,7 @@ export default function CuentaPage() {
               </h1>
 
               <p style={{ margin: 0, color: "#8d6278" }}>
-                Desde aquí podrás revisar tu saldo, recargar y ver tus compras.
+                Desde aquí podrás revisar tu saldo y tus pedidos.
               </p>
             </div>
 
@@ -305,23 +313,6 @@ export default function CuentaPage() {
               >
                 Ir a la tienda
               </a>
-
-              {perfil?.role === "admin" ? (
-                <a
-                  href="/admin"
-                  style={{
-                    textDecoration: "none",
-                    background: "#fff",
-                    color: "#9a6b82",
-                    padding: "12px 16px",
-                    borderRadius: "14px",
-                    fontWeight: "bold",
-                    border: "1px solid #f4c5db",
-                  }}
-                >
-                  Panel admin
-                </a>
-              ) : null}
 
               <button
                 onClick={cerrarSesion}
@@ -399,6 +390,7 @@ export default function CuentaPage() {
                 {pedidos.map((pedido) => {
                   const statusStyle = getStatusStyle(pedido.status);
                   const mensajes = mensajesPorPedido[pedido.id] || [];
+                  const isOpen = !!expandedOrders[pedido.id];
 
                   return (
                     <div
@@ -419,150 +411,236 @@ export default function CuentaPage() {
                           alignItems: "center",
                         }}
                       >
-                        <div style={{ fontWeight: "bold", color: "#c5578b", fontSize: "20px" }}>
-                          {pedido.product_name}
-                        </div>
-
-                        <div
-                          style={{
-                            ...statusStyle,
-                            borderRadius: "999px",
-                            padding: "8px 12px",
-                            fontWeight: "bold",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {pedido.status}
-                        </div>
-                      </div>
-
-                      <div style={{ color: "#8d6278", marginTop: "8px" }}>
-                        Precio: {pedido.price} créditos
-                      </div>
-
-                      <div style={{ color: "#8d6278", marginTop: "4px" }}>
-                        Fecha: {formatDate(pedido.created_at)}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          padding: "8px 12px",
-                          borderRadius: "12px",
-                          background: pedido.chat_closed ? "#fff1f1" : "#eefcf3",
-                          color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
-                          border: pedido.chat_closed
-                            ? "1px solid #efc6c6"
-                            : "1px solid #c9ebd3",
-                          fontWeight: "bold",
-                          fontSize: "14px",
-                          display: "inline-block",
-                        }}
-                      >
-                        {pedido.chat_closed ? "Chat cerrado por admin" : "Chat abierto"}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: "14px",
-                          background: "#fffafc",
-                          border: "1px solid #f4c5db",
-                          borderRadius: "16px",
-                          padding: "14px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: "bold",
-                            color: "#c5578b",
-                            marginBottom: "10px",
-                          }}
-                        >
-                          Chat del pedido
-                        </div>
-
-                        <div style={{ display: "grid", gap: "10px" }}>
-                          {mensajes.length === 0 ? (
-                            <div style={{ color: "#8d6278", fontSize: "14px" }}>
-                              Todavía no hay mensajes en este pedido.
-                            </div>
-                          ) : (
-                            mensajes.map((msg) => (
-                              <div
-                                key={msg.id}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: "12px",
-                                  background:
-                                    msg.sender_role === "admin" ? "#fff1f7" : "#f9f7ff",
-                                  border: "1px solid #f1d5e3",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: "bold",
-                                    color: "#b36088",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {msg.sender_role === "admin" ? "Admin" : "Tú"} ·{" "}
-                                  {formatDate(msg.created_at)}
-                                </div>
-                                <div style={{ color: "#7c4a65", whiteSpace: "pre-wrap" }}>
-                                  {msg.message}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-
-                        <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
-                          <textarea
-                            rows={3}
-                            placeholder={
-                              pedido.chat_closed
-                                ? "Este chat fue cerrado por admin."
-                                : "Escribe un mensaje sobre este pedido..."
-                            }
-                            value={nuevoMensaje[pedido.id] || ""}
-                            onChange={(e) =>
-                              setNuevoMensaje((prev) => ({
-                                ...prev,
-                                [pedido.id]: e.target.value,
-                              }))
-                            }
-                            disabled={pedido.chat_closed}
+                        <div>
+                          <div
                             style={{
-                              width: "100%",
-                              padding: "12px",
-                              borderRadius: "12px",
-                              border: "1px solid #f4c5db",
-                              fontSize: "15px",
-                              resize: "vertical",
-                              boxSizing: "border-box",
-                              background: pedido.chat_closed ? "#f7f2f5" : "white",
+                              fontWeight: "bold",
+                              color: "#c5578b",
+                              fontSize: "20px",
                             }}
-                          />
+                          >
+                            {pedido.product_name}
+                          </div>
+
+                          <div style={{ color: "#8d6278", marginTop: "8px" }}>
+                            Precio: {pedido.price} créditos
+                          </div>
+
+                          <div style={{ color: "#8d6278", marginTop: "4px" }}>
+                            Fecha: {formatDate(pedido.created_at)}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          <div
+                            style={{
+                              ...statusStyle,
+                              borderRadius: "999px",
+                              padding: "8px 12px",
+                              fontWeight: "bold",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {pedido.status}
+                          </div>
 
                           <button
-                            onClick={() => enviarMensaje(pedido.id)}
-                            disabled={pedido.chat_closed}
+                            onClick={() => toggleOrder(pedido.id)}
                             style={{
-                              border: "none",
-                              background: pedido.chat_closed ? "#d8c5cf" : "#e98ab3",
-                              color: "white",
+                              border: "1px solid #f4c5db",
+                              background: "#fff",
+                              color: "#9a6b82",
                               borderRadius: "12px",
                               padding: "10px 14px",
                               fontWeight: "bold",
-                              cursor: pedido.chat_closed ? "not-allowed" : "pointer",
-                              width: "fit-content",
+                              cursor: "pointer",
                             }}
                           >
-                            Enviar mensaje
+                            {isOpen ? "Ocultar" : "Ver pedido"}
                           </button>
                         </div>
                       </div>
+
+                      {!isOpen ? null : (
+                        <>
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              padding: "8px 12px",
+                              borderRadius: "12px",
+                              background: pedido.chat_closed
+                                ? "#fff1f1"
+                                : "#eefcf3",
+                              color: pedido.chat_closed ? "#c56b6b" : "#4c9a69",
+                              border: pedido.chat_closed
+                                ? "1px solid #efc6c6"
+                                : "1px solid #c9ebd3",
+                              fontWeight: "bold",
+                              fontSize: "14px",
+                              display: "inline-block",
+                            }}
+                          >
+                            {pedido.chat_closed ? "Chat cerrado por admin" : "Chat abierto"}
+                          </div>
+
+                          {pedido.delivery_message ? (
+                            <div
+                              style={{
+                                marginTop: "12px",
+                                padding: "12px",
+                                borderRadius: "12px",
+                                background: "#fff7fb",
+                                border: "1px solid #f4c5db",
+                                color: "#8d6278",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              <strong style={{ color: "#c5578b" }}>Entrega:</strong>
+                              <br />
+                              {pedido.delivery_message}
+                            </div>
+                          ) : null}
+
+                          {pedido.admin_comment ? (
+                            <div
+                              style={{
+                                marginTop: "12px",
+                                padding: "12px",
+                                borderRadius: "12px",
+                                background: "#fff7fb",
+                                border: "1px solid #f4c5db",
+                                color: "#8d6278",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              <strong style={{ color: "#c5578b" }}>Comentario:</strong>
+                              <br />
+                              {pedido.admin_comment}
+                            </div>
+                          ) : null}
+
+                          <div
+                            style={{
+                              marginTop: "14px",
+                              background: "#fffafc",
+                              border: "1px solid #f4c5db",
+                              borderRadius: "16px",
+                              padding: "14px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                color: "#c5578b",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              Chat del pedido
+                            </div>
+
+                            <div style={{ display: "grid", gap: "10px" }}>
+                              {mensajes.length === 0 ? (
+                                <div style={{ color: "#8d6278", fontSize: "14px" }}>
+                                  Todavía no hay mensajes en este pedido.
+                                </div>
+                              ) : (
+                                mensajes.map((msg) => (
+                                  <div
+                                    key={msg.id}
+                                    style={{
+                                      padding: "10px 12px",
+                                      borderRadius: "12px",
+                                      background:
+                                        msg.sender_role === "admin"
+                                          ? "#fff1f7"
+                                          : "#f9f7ff",
+                                      border: "1px solid #f1d5e3",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: "bold",
+                                        color: "#b36088",
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      {msg.sender_role === "admin" ? "Admin" : "Tú"} ·{" "}
+                                      {formatDate(msg.created_at)}
+                                    </div>
+                                    <div
+                                      style={{
+                                        color: "#7c4a65",
+                                        whiteSpace: "pre-wrap",
+                                      }}
+                                    >
+                                      {msg.message}
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "12px",
+                                display: "grid",
+                                gap: "10px",
+                              }}
+                            >
+                              <textarea
+                                rows={3}
+                                placeholder={
+                                  pedido.chat_closed
+                                    ? "Este chat fue cerrado por admin."
+                                    : "Escribe un mensaje sobre este pedido..."
+                                }
+                                value={nuevoMensaje[pedido.id] || ""}
+                                onChange={(e) =>
+                                  setNuevoMensaje((prev) => ({
+                                    ...prev,
+                                    [pedido.id]: e.target.value,
+                                  }))
+                                }
+                                disabled={pedido.chat_closed}
+                                style={{
+                                  width: "100%",
+                                  padding: "12px",
+                                  borderRadius: "12px",
+                                  border: "1px solid #f4c5db",
+                                  fontSize: "15px",
+                                  resize: "vertical",
+                                  boxSizing: "border-box",
+                                  background: pedido.chat_closed
+                                    ? "#f7f2f5"
+                                    : "white",
+                                }}
+                              />
+
+                              <button
+                                onClick={() => enviarMensaje(pedido.id)}
+                                disabled={pedido.chat_closed}
+                                style={{
+                                  border: "none",
+                                  background: pedido.chat_closed
+                                    ? "#d8c5cf"
+                                    : "#e98ab3",
+                                  color: "white",
+                                  borderRadius: "12px",
+                                  padding: "10px 14px",
+                                  fontWeight: "bold",
+                                  cursor: pedido.chat_closed
+                                    ? "not-allowed"
+                                    : "pointer",
+                                  width: "fit-content",
+                                }}
+                              >
+                                Enviar mensaje
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
