@@ -275,11 +275,74 @@ export default function AdminPage() {
     if (showLoading) setCargando(false);
   }
 
+  async function cargarPedidosYMensajes() {
+    const { data: userData } = await supabase.auth.getUser();
+
+    if (!userData?.user) return;
+
+    const { data: miPerfil, error: perfilError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userData.user.id)
+      .single();
+
+    if (perfilError || !miPerfil || miPerfil.role !== "admin") return;
+
+    const { data: listaPedidos } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const pedidosFinal = listaPedidos || [];
+    setPedidos(pedidosFinal);
+
+    setPedidosEditados((prev) => {
+      const next = { ...prev };
+
+      pedidosFinal.forEach((p) => {
+        if (!next[p.id]) {
+          next[p.id] = {
+            delivery_message: p.delivery_message || "",
+            admin_comment: p.admin_comment || "",
+          };
+        }
+      });
+
+      return next;
+    });
+
+    const pedidoIds = pedidosFinal.map((p) => p.id);
+    const mensajesMap = {};
+
+    if (pedidoIds.length > 0) {
+      const { data: mensajesData } = await supabase
+        .from("order_messages")
+        .select("*")
+        .in("order_id", pedidoIds)
+        .order("created_at", { ascending: true });
+
+      (mensajesData || []).forEach((msg) => {
+        if (!mensajesMap[msg.order_id]) {
+          mensajesMap[msg.order_id] = [];
+        }
+        mensajesMap[msg.order_id].push(msg);
+      });
+    }
+
+    setMensajesPorPedido(mensajesMap);
+  }
+
   useEffect(() => {
     cargarTodo(true);
   }, []);
-  
-  
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cargarPedidosYMensajes();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const stats = useMemo(() => {
     const pedidosPendientes = pedidos.filter((p) =>
@@ -324,7 +387,7 @@ export default function AdminPage() {
       .eq("id", id);
 
     if (error) {
-      setMensaje("No se pudo actualizar el saldo.");
+      setMensaje("No se pudo actualizar el saldo: " + error.message);
       return;
     }
 
