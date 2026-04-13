@@ -279,13 +279,7 @@ export default function AdminPage() {
     cargarTodo(true);
   }, []);
   
-  useEffect(() => {
-  const interval = setInterval(() => {
-    cargarTodo(false);
-  }, 3000);
-
-  return () => clearInterval(interval);
-}, []);
+  
 
   const stats = useMemo(() => {
     const pedidosPendientes = pedidos.filter((p) =>
