@@ -468,7 +468,7 @@ export default function AdminPage() {
 
   const eliminarProducto = async (productoId, nombreProducto) => {
     const confirmado = window.confirm(
-      ¿Seguro que quieres eliminar "${nombreProducto}"?
+      `¿Seguro que quieres eliminar "${nombreProducto}"?`
     );
 
     if (!confirmado) return;
@@ -560,7 +560,9 @@ export default function AdminPage() {
       )
     );
 
-    setMensaje(cerrado ? "Chat cerrado correctamente 💖" : "Chat reabierto correctamente 💖");
+    setMensaje(
+      cerrado ? "Chat cerrado correctamente 💖" : "Chat reabierto correctamente 💖"
+    );
   };
 
   const guardarDetallePedido = async (pedidoId) => {
@@ -671,7 +673,8 @@ export default function AdminPage() {
             order_id: pedidoId,
             user_id: perfil.id,
             sender_role: "admin",
-            message: "Tu solicitud fue aprobada. El chat fue reabierto para revisión de garantía/reposición.",
+            message:
+              "Tu solicitud fue aprobada. El chat fue reabierto para revisión de garantía/reposición.",
           },
         ])
         .select()
@@ -1177,8 +1180,7 @@ export default function AdminPage() {
                         <div
                           style={{
                             display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(220px, 1fr))",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                             gap: "12px",
                           }}
                         >
@@ -1491,9 +1493,7 @@ export default function AdminPage() {
                                 Esperando para tomar Orden
                               </button>
                               <button
-                                onClick={() =>
-                                  cambiarEstadoPedido(pedido.id, "Preparacion")
-                                }
+                                onClick={() => cambiarEstadoPedido(pedido.id, "Preparacion")}
                                 style={smallBtn("#c5578b")}
                               >
                                 Preparacion
@@ -1510,9 +1510,7 @@ export default function AdminPage() {
                                 Entrega
                               </button>
                               <button
-                                onClick={() =>
-                                  cambiarEstadoPedido(pedido.id, "Cancelado")
-                                }
+                                onClick={() => cambiarEstadoPedido(pedido.id, "Cancelado")}
                                 style={smallBtn("#94456b")}
                               >
                                 Cancelado
