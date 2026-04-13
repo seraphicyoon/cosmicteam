@@ -222,62 +222,78 @@ export default function CuentaPage() {
     }));
   }
 
-  async function solicitarReapertura(orderId) {
-    const motivo = (reopenForms[orderId] || "").trim();
-    if (!motivo) {
-      setAviso("Escribe el motivo de la reposición.");
-      return;
-    }
+async function solicitarReapertura(orderId) {
+  const motivo = (reopenForms[orderId] || "").trim();
 
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        reopen_requested: true,
-        reopen_reason: motivo,
-      })
-      .eq("id", orderId);
+  if (!motivo) {
+    setAviso("Escribe el motivo de la reposición.");
+    return;
+  }
 
-    if (error) {
-      setAviso("No se pudo enviar la solicitud.");
-      return;
-    }
+  if (!perfil?.id) {
+    setAviso("No se pudo identificar tu cuenta.");
+    return;
+  }
 
-    const { data: msgData } = await supabase
-      .from("order_messages")
-      .insert([
-        {
-          order_id: orderId,
-          user_id: perfil.id,
-          sender_role: "user",
-          message:
-            "Solicité reapertura del chat por reposición/garantía.\nMotivo: " +
-            motivo,
-        },
-      ])
-      .select()
-      .single();
+  const { data: updatedOrder, error } = await supabase
+    .from("orders")
+    .update({
+      reopen_requested: true,
+      reopen_reason: motivo,
+    })
+    .eq("id", orderId)
+    .eq("user_id", perfil.id)
+    .select()
+    .single();
 
-    if (msgData) {
-      setMensajesPorPedido((prev) => ({
-        ...prev,
-        [orderId]: [...(prev[orderId] || []), msgData],
-      }));
-    }
-
-    setPedidos((prev) =>
-      prev.map((p) =>
-        p.id === orderId
-          ? { ...p, reopen_requested: true, reopen_reason: motivo }
-          : p
-      )
+  if (error || !updatedOrder) {
+    setAviso(
+      "No se pudo enviar la solicitud. Revisa las políticas de Supabase para permitir que la clienta actualice su propio pedido."
     );
+    return;
+  }
 
-    setReopenForms((prev) => ({
+  const { data: msgData } = await supabase
+    .from("order_messages")
+    .insert([
+      {
+        order_id: orderId,
+        user_id: perfil.id,
+        sender_role: "user",
+        message:
+          "Solicité reapertura del chat por reposición/garantía.\nMotivo: " +
+          motivo,
+      },
+    ])
+    .select()
+    .single();
+
+  if (msgData) {
+    setMensajesPorPedido((prev) => ({
       ...prev,
-      [orderId]: "",
+      [orderId]: [...(prev[orderId] || []), msgData],
     }));
+  }
 
-    setAviso("Solicitud enviada correctamente 💖");
+  setPedidos((prev) =>
+    prev.map((p) =>
+      p.id === orderId
+        ? {
+            ...p,
+            reopen_requested: true,
+            reopen_reason: motivo,
+          }
+        : p
+    )
+  );
+
+  setReopenForms((prev) => ({
+    ...prev,
+    [orderId]: "",
+  }));
+
+  setAviso("Solicitud enviada correctamente 💖");
+}
   }
 
   if (cargando) {
