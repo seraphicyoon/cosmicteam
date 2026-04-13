@@ -294,7 +294,6 @@ async function solicitarReapertura(orderId) {
 
   setAviso("Solicitud enviada correctamente 💖");
 }
-  }
 
   if (cargando) {
     return (
