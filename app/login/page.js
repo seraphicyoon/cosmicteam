@@ -3,37 +3,173 @@
 import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 
+function usernameToEmail(username) {
+  return `${String(username || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")}@cosmicteam.local`;
+}
+
 export default function LoginPage() {
   const [modo, setModo] = useState("login");
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [cargando, setCargando] = useState(false);
 
   const handleLogin = async () => {
     setMensaje("");
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("username", usuario)
-      .single();
+    const username = usuario.trim();
+    const pass = password.trim();
 
-    if (error || !data) {
-      setMensaje("Usuario no encontrado.");
+    if (!username || !pass) {
+      setMensaje("Escribe tu usuario y contraseña.");
       return;
     }
 
-    if (data.password !== password) {
-      setMensaje("Contraseña incorrecta.");
+    setCargando(true);
+
+    try {
+      const email = usernameToEmail(username);
+
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+
+      if (loginError) {
+        setMensaje("Usuario o contraseña incorrectos.");
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setMensaje("No se pudo iniciar sesión.");
+        return;
+      }
+
+      const { data: perfil, error: perfilError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (perfilError || !perfil) {
+        setMensaje("No se encontró tu perfil.");
+        return;
+      }
+
+      if (perfil.role === "admin") {
+        window.location.href = "/admin";
+      } else {
+        window.location.href = "/cuenta";
+      }
+    } catch (e) {
+      setMensaje("Ocurrió un error al iniciar sesión.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setMensaje("");
+
+    const username = usuario.trim();
+    const pass = password.trim();
+
+    if (!username || !pass) {
+      setMensaje("Escribe un usuario y una contraseña.");
       return;
     }
 
-    localStorage.setItem("user_id", data.id);
+    if (username.length < 3) {
+      setMensaje("El usuario debe tener al menos 3 caracteres.");
+      return;
+    }
 
-    if (data.role === "admin") {
-      window.location.href = "/admin";
-    } else {
+    if (pass.length < 6) {
+      setMensaje("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    setCargando(true);
+
+    try {
+      const email = usernameToEmail(username);
+
+      const { data: existingUser } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username)
+        .maybeSingle();
+
+      if (existingUser) {
+        setMensaje("Ese usuario ya existe.");
+        return;
+      }
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+        {
+          email,
+          password: pass,
+        }
+      );
+
+      if (signUpError) {
+        setMensaje("No se pudo crear la cuenta: " + signUpError.message);
+        return;
+      }
+
+      const newUser = signUpData?.user;
+
+      if (!newUser) {
+        setMensaje("No se pudo crear la cuenta.");
+        return;
+      }
+
+      const { error: profileError } = await supabase.from("profiles").insert([
+        {
+          id: newUser.id,
+          username,
+          role: "user",
+          balance: 0,
+          password: pass,
+        },
+      ]);
+
+      if (profileError) {
+        setMensaje("La cuenta auth se creó, pero falló el perfil: " + profileError.message);
+        return;
+      }
+
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+
+      if (loginError) {
+        setMensaje("Cuenta creada. Ahora inicia sesión.");
+        setModo("login");
+        return;
+      }
+
       window.location.href = "/cuenta";
+    } catch (e) {
+      setMensaje("Ocurrió un error al registrarte.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (modo === "login") {
+      handleLogin();
+    } else {
+      handleRegister();
     }
   };
 
@@ -48,8 +184,6 @@ export default function LoginPage() {
       }}
     >
       <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        
-        {/* 🔥 BANNER */}
         <div
           style={{
             background: "#eaa3c2",
@@ -59,9 +193,7 @@ export default function LoginPage() {
             border: "1px solid #f2bcd6",
           }}
         >
-          <h1 style={{ color: "#b84d82", margin: 0 }}>
-            COSMICTEAM 💖
-          </h1>
+          <h1 style={{ color: "#b84d82", margin: 0 }}>COSMICTEAM 💖</h1>
 
           <p style={{ color: "#8d6278", marginTop: "10px" }}>
             Precios más baratos que el mercado 🚀
@@ -94,28 +226,31 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div style={moreBox}>
-            Y mucho más... ✨
-          </div>
+          <div style={moreBox}>Y mucho más... ✨</div>
         </div>
 
-        {/* 💖 LOGIN */}
         <div style={loginBox}>
-          <h2 style={{ textAlign: "center", color: "#c5578b" }}>
-            COSMICTEAM
-          </h2>
+          <h2 style={{ textAlign: "center", color: "#c5578b" }}>COSMICTEAM</h2>
 
           <div style={tabs}>
             <button
-              onClick={() => setModo("login")}
+              onClick={() => {
+                setModo("login");
+                setMensaje("");
+              }}
               style={modo === "login" ? tabActive : tab}
+              type="button"
             >
               Iniciar sesión
             </button>
 
             <button
-              onClick={() => setModo("register")}
+              onClick={() => {
+                setModo("register");
+                setMensaje("");
+              }}
               style={modo === "register" ? tabActive : tab}
+              type="button"
             >
               Registrarse
             </button>
@@ -136,14 +271,30 @@ export default function LoginPage() {
             style={input}
           />
 
-          <button onClick={handleLogin} style={loginBtn}>
-            Entrar a mi cuenta
+          <button onClick={handleSubmit} style={loginBtn} disabled={cargando}>
+            {cargando
+              ? modo === "login"
+                ? "Entrando..."
+                : "Creando cuenta..."
+              : modo === "login"
+              ? "Entrar a mi cuenta"
+              : "Crear mi cuenta"}
           </button>
 
-          {mensaje && <p style={{ color: "#c5578b" }}>{mensaje}</p>}
+          {mensaje ? (
+            <p
+              style={{
+                color: "#c5578b",
+                marginTop: "14px",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
+            >
+              {mensaje}
+            </p>
+          ) : null}
         </div>
 
-        {/* ⭐ POR QUÉ ELEGIRNOS (ABAJO AHORA) */}
         <div style={{ marginTop: "40px" }}>
           <h2 style={sectionTitle}>¿Por qué elegirnos?</h2>
           <p style={sectionSub}>
@@ -154,43 +305,32 @@ export default function LoginPage() {
             <div style={featureCard}>
               💬
               <h3>Soporte rápido</h3>
-              <p>
-                Puedes hablar directo desde el pedido y recibir ayuda más rápida.
-              </p>
+              <p>Puedes hablar directo desde el pedido y recibir ayuda más rápida.</p>
             </div>
 
             <div style={featureCard}>
               ⚡
               <h3>Entrega sencilla</h3>
-              <p>
-                Todo se entrega dentro del pedido de forma clara y ordenada.
-              </p>
+              <p>Todo se entrega dentro del pedido de forma clara y ordenada.</p>
             </div>
 
             <div style={featureCard}>
               💸
               <h3>Precios accesibles</h3>
-              <p>
-                Servicios mucho más baratos que el precio normal del mercado.
-              </p>
+              <p>Servicios mucho más baratos que el precio normal del mercado.</p>
             </div>
 
             <div style={featureCard}>
               📋
               <h3>Todo organizado</h3>
-              <p>
-                Revisa saldo, pedidos y mensajes en un solo lugar.
-              </p>
+              <p>Revisa saldo, pedidos y mensajes en un solo lugar.</p>
             </div>
           </div>
         </div>
-
       </div>
     </main>
   );
 }
-
-/* 🎨 ESTILOS */
 
 const cardStyle = {
   background: "#fff",
@@ -244,6 +384,7 @@ const tab = {
   padding: "10px",
   border: "none",
   background: "#eee",
+  cursor: "pointer",
 };
 
 const tabActive = {
@@ -258,6 +399,7 @@ const input = {
   marginBottom: "10px",
   borderRadius: "10px",
   border: "1px solid #f4c5db",
+  boxSizing: "border-box",
 };
 
 const loginBtn = {
@@ -268,6 +410,7 @@ const loginBtn = {
   border: "none",
   borderRadius: "10px",
   fontWeight: "bold",
+  cursor: "pointer",
 };
 
 const sectionTitle = {
