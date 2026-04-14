@@ -33,12 +33,12 @@ export default function LoginPage() {
     try {
       const email = usernameToEmail(username);
 
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password: pass,
       });
 
-      if (loginError) {
+      if (error) {
         setMensaje("Usuario o contraseña incorrectos.");
         return;
       }
@@ -47,29 +47,19 @@ export default function LoginPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        setMensaje("No se pudo iniciar sesión.");
-        return;
-      }
-
-      const { data: perfil, error: perfilError } = await supabase
+      const { data: perfil } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
-
-      if (perfilError || !perfil) {
-        setMensaje("No se encontró tu perfil.");
-        return;
-      }
 
       if (perfil.role === "admin") {
         window.location.href = "/admin";
       } else {
         window.location.href = "/cuenta";
       }
-    } catch (e) {
-      setMensaje("Ocurrió un error al iniciar sesión.");
+    } catch {
+      setMensaje("Error al iniciar sesión.");
     } finally {
       setCargando(false);
     }
@@ -82,17 +72,12 @@ export default function LoginPage() {
     const pass = password.trim();
 
     if (!username || !pass) {
-      setMensaje("Escribe un usuario y una contraseña.");
-      return;
-    }
-
-    if (username.length < 3) {
-      setMensaje("El usuario debe tener al menos 3 caracteres.");
+      setMensaje("Escribe usuario y contraseña.");
       return;
     }
 
     if (pass.length < 6) {
-      setMensaje("La contraseña debe tener al menos 6 caracteres.");
+      setMensaje("La contraseña debe tener mínimo 6 caracteres.");
       return;
     }
 
@@ -101,156 +86,112 @@ export default function LoginPage() {
     try {
       const email = usernameToEmail(username);
 
-      const { data: existingUser } = await supabase
+      const { data: exists } = await supabase
         .from("profiles")
         .select("id")
         .eq("username", username)
         .maybeSingle();
 
-      if (existingUser) {
+      if (exists) {
         setMensaje("Ese usuario ya existe.");
         return;
       }
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
-        {
-          email,
-          password: pass,
-        }
-      );
-
-      if (signUpError) {
-        setMensaje("No se pudo crear la cuenta: " + signUpError.message);
-        return;
-      }
-
-      const newUser = signUpData?.user;
-
-      if (!newUser) {
-        setMensaje("No se pudo crear la cuenta.");
-        return;
-      }
-
-      const { error: profileError } = await supabase.from("profiles").insert([
-        {
-          id: newUser.id,
-          username,
-          role: "user",
-          balance: 0,
-          password: pass,
-        },
-      ]);
-
-      if (profileError) {
-        setMensaje("La cuenta auth se creó, pero falló el perfil: " + profileError.message);
-        return;
-      }
-
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
       });
 
-      if (loginError) {
-        setMensaje("Cuenta creada. Ahora inicia sesión.");
-        setModo("login");
+      if (error) {
+        setMensaje(error.message);
         return;
       }
 
+      const user = data.user;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert([
+          {
+            id: user.id,
+            username,
+            role: "user",
+            balance: 0,
+          },
+        ]);
+
+      if (profileError) {
+        setMensaje("Error al crear perfil.");
+        return;
+      }
+
+      await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+
       window.location.href = "/cuenta";
-    } catch (e) {
-      setMensaje("Ocurrió un error al registrarte.");
+    } catch {
+      setMensaje("Error al registrarte.");
     } finally {
       setCargando(false);
     }
   };
 
   const handleSubmit = () => {
-    if (modo === "login") {
-      handleLogin();
-    } else {
-      handleRegister();
-    }
+    if (modo === "login") handleLogin();
+    else handleRegister();
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(180deg, #fff8fc 0%, #ffeef7 45%, #fffaf3 100%)",
-        fontFamily: "Arial, sans-serif",
-        padding: "20px",
-      }}
-    >
+    <main style={main}>
       <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        <div
-          style={{
-            background: "#eaa3c2",
-            borderRadius: "28px",
-            padding: "26px",
-            marginBottom: "30px",
-            border: "1px solid #f2bcd6",
-          }}
-        >
-          <h1 style={{ color: "#b84d82", margin: 0 }}>COSMICTEAM 💖</h1>
-
-          <p style={{ color: "#8d6278", marginTop: "10px" }}>
+        
+        {/* BANNER */}
+        <div style={banner}>
+          <h1 style={{ color: "#b84d82" }}>COSMICTEAM 💖</h1>
+          <p style={{ color: "#8d6278" }}>
             Precios más baratos que el mercado 🚀
           </p>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "14px",
-              marginTop: "16px",
-            }}
-          >
-            <div style={cardStyle}>
-              <b style={titleStyle}>ChatGPT Pro</b>
-              <p style={smallText}>Precio real: ~350 MXN</p>
-              <p style={greenText}>Tu precio: 60 MXN 💸</p>
+          <div style={grid}>
+            <div style={card}>
+              <b>ChatGPT Pro</b>
+              <p>Precio real: ~350 MXN</p>
+              <p style={{ color: "green" }}>Tu precio: 60 MXN</p>
             </div>
 
-            <div style={cardStyle}>
-              <b style={titleStyle}>Canva Pro (1 año)</b>
-              <p style={smallText}>Precio real: ~2000 MXN</p>
-              <p style={greenText}>Tu precio: 50 MXN 💸</p>
+            <div style={card}>
+              <b>Canva Pro</b>
+              <p>Precio real: ~2000 MXN</p>
+              <p style={{ color: "green" }}>Tu precio: 50 MXN</p>
             </div>
 
-            <div style={cardStyle}>
-              <b style={titleStyle}>CapCut Pro (1 mes)</b>
-              <p style={smallText}>Precio real: ~170 MXN</p>
-              <p style={greenText}>Tu precio: 40 MXN 💸</p>
+            <div style={card}>
+              <b>CapCut Pro</b>
+              <p>Precio real: ~170 MXN</p>
+              <p style={{ color: "green" }}>Tu precio: 40 MXN</p>
             </div>
           </div>
 
-          <div style={moreBox}>Y mucho más... ✨</div>
+          <div style={more}>Y mucho más... ✨</div>
         </div>
 
+        {/* LOGIN */}
         <div style={loginBox}>
-          <h2 style={{ textAlign: "center", color: "#c5578b" }}>COSMICTEAM</h2>
+          <h2 style={{ textAlign: "center" }}>COSMICTEAM</h2>
 
           <div style={tabs}>
             <button
-              onClick={() => {
-                setModo("login");
-                setMensaje("");
-              }}
-              style={modo === "login" ? tabActive : tab}
-              type="button"
+              onClick={() => setModo("login")}
+              style={modo === "login" ? activeTab : tab}
             >
               Iniciar sesión
             </button>
 
             <button
-              onClick={() => {
-                setModo("register");
-                setMensaje("");
-              }}
-              style={modo === "register" ? tabActive : tab}
-              type="button"
+              onClick={() => setModo("register")}
+              style={modo === "register" ? activeTab : tab}
             >
               Registrarse
             </button>
@@ -271,123 +212,73 @@ export default function LoginPage() {
             style={input}
           />
 
-          <button onClick={handleSubmit} style={loginBtn} disabled={cargando}>
-            {cargando
-              ? modo === "login"
-                ? "Entrando..."
-                : "Creando cuenta..."
-              : modo === "login"
-              ? "Entrar a mi cuenta"
-              : "Crear mi cuenta"}
+          <button onClick={handleSubmit} style={btn}>
+            {modo === "login" ? "Entrar" : "Crear cuenta"}
           </button>
 
-          {mensaje ? (
-            <p
-              style={{
-                color: "#c5578b",
-                marginTop: "14px",
-                textAlign: "center",
-                fontWeight: "bold",
-              }}
-            >
-              {mensaje}
-            </p>
-          ) : null}
+          {mensaje && <p style={{ color: "#c5578b" }}>{mensaje}</p>}
         </div>
 
-        <div style={{ marginTop: "40px" }}>
-          <h2 style={sectionTitle}>¿Por qué elegirnos?</h2>
-          <p style={sectionSub}>
-            Todo pensado para que compres fácil, rápido y con confianza.
-          </p>
-
-          <div style={grid}>
-            <div style={featureCard}>
-              💬
-              <h3>Soporte rápido</h3>
-              <p>Puedes hablar directo desde el pedido y recibir ayuda más rápida.</p>
-            </div>
-
-            <div style={featureCard}>
-              ⚡
-              <h3>Entrega sencilla</h3>
-              <p>Todo se entrega dentro del pedido de forma clara y ordenada.</p>
-            </div>
-
-            <div style={featureCard}>
-              💸
-              <h3>Precios accesibles</h3>
-              <p>Servicios mucho más baratos que el precio normal del mercado.</p>
-            </div>
-
-            <div style={featureCard}>
-              📋
-              <h3>Todo organizado</h3>
-              <p>Revisa saldo, pedidos y mensajes en un solo lugar.</p>
-            </div>
-          </div>
-        </div>
       </div>
     </main>
   );
 }
 
-const cardStyle = {
-  background: "#fff",
-  borderRadius: "16px",
-  padding: "14px",
-  border: "1px solid #f4c5db",
+/* estilos */
+
+const main = {
+  minHeight: "100vh",
+  background:
+    "linear-gradient(180deg, #fff8fc 0%, #ffeef7 45%, #fffaf3 100%)",
+  padding: "20px",
+  fontFamily: "Arial",
 };
 
-const titleStyle = {
-  color: "#c5578b",
-  fontSize: "16px",
+const banner = {
+  background: "#eaa3c2",
+  borderRadius: "20px",
+  padding: "20px",
+  marginBottom: "30px",
 };
 
-const smallText = {
-  fontSize: "13px",
-  color: "#8d6278",
+const grid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+  gap: "10px",
 };
 
-const greenText = {
-  color: "#4c9a69",
-  fontWeight: "bold",
-};
-
-const moreBox = {
-  marginTop: "14px",
+const card = {
+  background: "white",
   padding: "10px",
-  borderRadius: "14px",
-  background: "#fff",
+  borderRadius: "10px",
+};
+
+const more = {
+  marginTop: "10px",
   textAlign: "center",
-  color: "#b84d82",
   fontWeight: "bold",
 };
 
 const loginBox = {
   maxWidth: "400px",
   margin: "0 auto",
-  background: "#fff",
+  background: "white",
+  padding: "20px",
   borderRadius: "20px",
-  padding: "25px",
-  border: "1px solid #f4c5db",
 };
 
 const tabs = {
   display: "flex",
-  marginTop: "15px",
-  marginBottom: "15px",
+  marginBottom: "10px",
 };
 
 const tab = {
   flex: 1,
   padding: "10px",
-  border: "none",
   background: "#eee",
-  cursor: "pointer",
 };
 
-const tabActive = {
+const activeTab = {
   ...tab,
   background: "#e98ab3",
   color: "white",
@@ -397,44 +288,12 @@ const input = {
   width: "100%",
   padding: "10px",
   marginBottom: "10px",
-  borderRadius: "10px",
-  border: "1px solid #f4c5db",
-  boxSizing: "border-box",
 };
 
-const loginBtn = {
+const btn = {
   width: "100%",
-  padding: "12px",
+  padding: "10px",
   background: "#e98ab3",
   color: "white",
   border: "none",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
-
-const sectionTitle = {
-  textAlign: "center",
-  color: "#c5578b",
-  fontSize: "28px",
-};
-
-const sectionSub = {
-  textAlign: "center",
-  color: "#8d6278",
-  marginBottom: "20px",
-};
-
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "15px",
-};
-
-const featureCard = {
-  background: "#fff",
-  border: "1px solid #f4c5db",
-  borderRadius: "18px",
-  padding: "20px",
-  textAlign: "center",
 };
